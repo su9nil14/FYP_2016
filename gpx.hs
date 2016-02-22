@@ -1,3 +1,4 @@
+-- credit to : https://github.com/nurpax/gpx-utils
 {-# LANGUAGE Arrows, NoMonomorphismRestriction #-}
 import Text.XML.HXT.Core
 import Data.Time(UTCTime, readTime, diffUTCTime)
