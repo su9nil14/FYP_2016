@@ -16,3 +16,5 @@ http://www.topografix.com/GPX/1/1/
 https://hackage.haskell.org/package/GPX
 
 https://www.schoolofhaskell.com/school/advanced-haskell/xml-parsing-with-validation
+
+https://www.haskell.org/hoogle/?hoogle=uncurry+%2bbase
