@@ -14,3 +14,5 @@ Similar project at -- https://github.com/nurpax/gpx-utils
 http://www.topografix.com/GPX/1/1/
 
 https://hackage.haskell.org/package/GPX
+
+https://www.schoolofhaskell.com/school/advanced-haskell/xml-parsing-with-validation
