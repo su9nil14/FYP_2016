@@ -13,6 +13,11 @@ import System.Environment
 import Data.Tree.NTree.TypeDefs
 import Graphics.Gnuplot.Simple
 import System.Console.Haskeline
+import Control.Monad.Trans
+
+
+
+type Repl a = InputT IO a
 
 
 data Trkseg = Trkseg [Trkpt] deriving (Eq, Show)
@@ -113,14 +118,23 @@ formatElevation s = show (s)
 parseGPX :: String -> IOStateArrow s b XmlTree
 parseGPX file = readDocument [ withValidate yes, withRemoveWS yes] file
 
---TODO  REPL (Read-Evaluation-Print Loop)
+printOutput ::String ->IO ()
+printOutput file = do
+ trackSegs <- runX (parseGPX file >>> getTrkseg)
+ let (seconds, lenKm, lenelev) = trackLength $ head trackSegs
+ putStrLn (printf "Track distance (km):     %.2f" $ lenKm)
+ putStrLn (printf "Track duration (h:m:s):  %s" $ formatTimeDeltaHMS seconds)
+ putStrLn (printf "Average pace (km/hr):   %.4s" $ formatTimeDeltaMS (lenKm/seconds))
+ putStrLn (printf "Elevation (m):   %s" $ formatElevation (lenelev)) -- this gives wrong result
+ putStrLn (printf "\n")
+
+
+repl :: Repl ()
+repl = do
+  minput <- getInputLine "Please enter input file - (path/filename) "
+  case minput of
+    Nothing -> outputStrLn "Quitting."
+    Just input -> (liftIO $ printOutput input ) >> repl
 
 main :: IO ()
-main =
-  do
-    trackSegs <- runX (parseGPX "test_files/test1.gpx" >>> getTrkseg)
-    let (seconds, lenKm, lenelev) = trackLength $ head trackSegs
-    putStrLn (printf "Track distance (km):     %.2f" lenKm)
-    putStrLn (printf "Track duration (h:m:s):  %s" $ formatTimeDeltaHMS seconds)
-    putStrLn (printf "Average pace (km/hr):   %.4s" $ formatTimeDeltaMS (lenKm/seconds))
-    putStrLn (printf "Elevation (m):   %s" $ formatElevation (lenelev)) -- this gives wrong result
+main = runInputT defaultSettings repl
