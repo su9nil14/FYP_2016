@@ -12,14 +12,17 @@ import Text.Printf
 import System.Environment
 import Data.Tree.NTree.TypeDefs
 --import Graphics.Gnuplot.Simple
-import System.Console.Haskeline
+--import System.Console.Haskeline
+import System.Console.CmdArgs.Explicit
+import System.Exit
+import System.IO
 import Control.Monad.Trans
 import Data.Maybe
 import Control.Monad
 import Control.Arrow
 
 
-type Repl a = InputT IO a
+--type Repl a = InputT IO a
 
 data Trkseg = Trkseg [Trkpt] deriving (Eq, Show)
 
@@ -132,23 +135,27 @@ summarizeGPX file = do
  putStrLn (printf "Average pace (mins/km):   %.4s" $ formatTimeDeltaMS (seconds/lenKm))
  putStrLn (printf "\n")
 
- --repl setting
-mySettings :: Settings IO
-mySettings = Settings { historyFile = Just "myhist", complete = completeFilename, autoAddHistory = True}
+main = do
+  hSetBuffering stdin LineBuffering
+  doLoop
+  
+doLoop = do
+  putStrLn "Enter a command. Enter ? for help:"
+  command <- getLine
+  case command of
+    '?':_ -> do help; doLoop
+    'q':_ -> do putStrLn ("Quitting!")
+    's':_ -> do summarize; doLoop
 
---todo
-help::String-> String
-help "load" = "Load a GPX file. Args = filename"
-help "help" = "Help... Add more later!"
-help "quit" = "Exit the program"
+    _            -> do putStrLn ("Nothing entered"); doLoop
 
-repl :: Repl ()
-repl = do
-  minput <- getInputLine "Please enter input file - (<path>/<filename>) :" 
-  case minput of
-    Nothing -> outputStrLn "Quitting."
-    Just  "quit"-> return()
-    Just input -> (liftIO $ summarizeGPX input ) >> repl
+summarize = do 
+  putStrLn "Enter a test file name with path:"
+  filename <- getLine
+  summarizeGPX filename
 
-main :: IO ()
-main = runInputT mySettings repl
+help = do
+  putStrLn "s - Summarizing GPX file"
+  putStrLn "? - Get this help message"
+  putStrLn "q - Quit the program"
+  
