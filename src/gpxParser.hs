@@ -1,12 +1,11 @@
 {-# LANGUAGE Arrows #-}
 
-module Main (
-    main
-) where
+module GPXparser where
 
 import Text.XML.HXT.Core
 import Data.Time(UTCTime, readTime, diffUTCTime)
 import Data.Time.Format(defaultTimeLocale)
+import Data.Text (Text)
 import Text.Printf (printf)
 import Text.Printf
 import System.Environment
@@ -16,25 +15,29 @@ import Data.Tree.NTree.TypeDefs
 import System.Console.CmdArgs.Explicit
 import System.Exit
 import System.IO
-import Control.Monad.Trans
-import Data.Maybe
-import Control.Monad
-import Control.Arrow
-
 
 --type Repl a = InputT IO a
 
-data Trkseg = Trkseg [Trkpt] deriving (Eq, Show)
+data Trkseg = Trkseg { points :: [Trkpt] } 
+            deriving (Eq, Ord, Show, Read)
+
+type Latitude = Double
+type Longitude = Double
 
 --define data structure - the child elements
-data Trkpt = Trkpt {
-  time :: UTCTime,
-  longitude :: Double,
-  latitude :: Double,
-  elevation :: Double
-  } deriving (Eq, Show)
+data Trkpt = Trkpt
+        { latitude  :: Latitude
+         ,longitude :: Longitude
+         ,elevation :: Double
+         ,time        :: UTCTime
+        }
+         deriving (Eq, Ord, Show, Read)
+		 
+point :: Latitude -> Longitude -> Double  -> UTCTime -> Trkpt
+point lt lg el tm = Trkpt lt lg el tm
 
--- derive time and timezone stuffs -- getting error -----  
+
+  -- derive time and timezone stuffs -- getting error -----  
 --In the use of `readTime' (imported from Data.Time, but defined in time-1.6:Data.Time.Format.Parse):
 --Deprecated: "use "parseTimeOrError True" instead"
 -- this error prevents using ghci
@@ -89,17 +92,30 @@ timeDelta :: Trkpt -> Trkpt -> Double
 timeDelta a b = realToFrac $ diffUTCTime (time b) (time a)  
   
 --elevation
---getMaxElev :: Trkpt  -> Double
---getMaxElev e= e where e = maximum[elevation]
---minEle e = minimum elevation
+meanElevation :: [Trkpt] -> Double
+meanElevation points = 
+            let elevationVals = map ( elevation) points
+                totalElevation = foldr (+) 0.0 elevationVals
+                theMean = totalElevation / fromIntegral (length points)
+            in theMean
 
+minElevation :: [Trkpt] -> Double
+minElevation points = 
+            let elevationVals = map ( elevation) points
+                theMin = minimum elevationVals
+            in theMin
+
+maxElevation :: [Trkpt] -> Double
+maxElevation points = 
+            let elevationVals = map ( elevation) points
+                theMax = maximum elevationVals
+            in theMax
   
 -- Length of track as (seconds, kms)
 trackLength :: Trkseg -> (Double, Double)
 trackLength (Trkseg segs) = (timeLen, kmLen) where
     kmLen = sum (map (uncurry segmentLength) segments)
     timeLen = sum (map (uncurry timeDelta) segments)
-    --elevlen = map (avgElev)
     segments = zip segs (tail segs)
     
 
@@ -124,38 +140,24 @@ formatElevation s = show (s)
 parseGPX :: String -> IOStateArrow s b XmlTree
 parseGPX file = readDocument [ withValidate yes, withRemoveWS yes] file
 
-
+--summarize data for gpx files
 summarizeGPX ::String ->IO ()
 summarizeGPX file = do
  trackSegs <- runX (parseGPX file >>> getTrkseg)
+ trackPts <- runX (parseGPX file >>> getTrkpt)
+ 
  let (seconds, lenKm) = trackLength $ head trackSegs
+ putStrLn (printf "\n")
  putStrLn (printf "Track distance (km):     %.2f" $ lenKm)
  putStrLn (printf "Track duration (h:m:s):  %s" $ formatTimeDeltaHMS seconds)
  putStrLn (printf "Average pace (km/hr):   %.4s" $ formatTimeDeltaMPS2KMH (lenKm/seconds))
  putStrLn (printf "Average pace (mins/km):   %.4s" $ formatTimeDeltaMS (seconds/lenKm))
+
+ let (meanelev) = meanElevation $ head [trackPts]
+ let (minelev) = minElevation $ head [trackPts]
+ let (maxelev) = maxElevation $ head [trackPts]
+ putStrLn (printf "Mean Elevation:  %.6s" $ formatElevation meanelev)
+ putStrLn (printf "Minimum Elevation:  %.6s" $ formatElevation minelev)
+ putStrLn (printf "MaximumElevation:  %.6s" $ formatElevation maxelev)
  putStrLn (printf "\n")
-
-main = do
-  hSetBuffering stdin LineBuffering
-  doLoop
-  
-doLoop = do
-  putStrLn "Enter a command. Enter ? for help:"
-  command <- getLine
-  case command of
-    '?':_ -> do help; doLoop
-    'q':_ -> do putStrLn ("Quitting!")
-    's':_ -> do summarize; doLoop
-
-    _            -> do putStrLn ("Nothing entered"); doLoop
-
-summarize = do 
-  putStrLn "Enter a test file name with path:"
-  filename <- getLine
-  summarizeGPX filename
-
-help = do
-  putStrLn "s - Summarizing GPX file"
-  putStrLn "? - Get this help message"
-  putStrLn "q - Quit the program"
   
