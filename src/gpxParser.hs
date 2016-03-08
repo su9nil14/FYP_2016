@@ -3,7 +3,7 @@
 module GPXparser where
 
 import Text.XML.HXT.Core
-import Data.Time(UTCTime, readTime, diffUTCTime)
+import Data.Time(UTCTime,readTime, diffUTCTime)
 import Data.Time.Format(defaultTimeLocale)
 import Data.Text (Text)
 import Text.Printf (printf)
@@ -18,7 +18,7 @@ import System.IO
 
 --type Repl a = InputT IO a
 
-data Trkseg = Trkseg { points :: [Trkpt] } 
+data Trkseg = Trkseg [Trkpt] 
             deriving (Eq, Ord, Show, Read)
 
 type Latitude = Double
@@ -87,38 +87,62 @@ segmentLength point_a point_b = radius * c where
   a = (sin dlat/2)^2 + (sin dlon/2)^2 * cos lat1 * cos lat2
   c = 2 * atan2 (sqrt a) (sqrt (1-a))
 
-
+--calculate time between two trackpoints
 timeDelta :: Trkpt -> Trkpt -> Double
 timeDelta a b = realToFrac $ diffUTCTime (time b) (time a)  
   
---elevation
-meanElevation :: [Trkpt] -> Double
-meanElevation points = 
+--calculate  the average elevation from the list of elevation
+averageElevation :: [Trkpt] -> Double
+averageElevation points = 
             let elevationVals = map ( elevation) points
                 totalElevation = foldr (+) 0.0 elevationVals
                 theMean = totalElevation / fromIntegral (length points)
             in theMean
 
+--calculate  the minimum elevation from the list of elevation
 minElevation :: [Trkpt] -> Double
 minElevation points = 
             let elevationVals = map ( elevation) points
                 theMin = minimum elevationVals
             in theMin
 
+--calculate  the maximum elevation from the list of elevation
 maxElevation :: [Trkpt] -> Double
 maxElevation points = 
-            let elevationVals = map ( elevation) points
+            let elevationVals = map (elevation) points
                 theMax = maximum elevationVals
             in theMax
-  
+			
+trackTime :: Trkseg -> [Double]
+trackTime (Trkseg segs) = (timeLen) where
+    timeLen = (map (uncurry timeDelta) segments)
+    segments = (zip segs (tail segs))
+	
+trackDist :: Trkseg -> [Double]
+trackDist (Trkseg segs) = (distLen) where
+    distLen = (map (uncurry segmentLength) segments)
+    segments = (zip segs (tail segs))
+
+--get pace values for each segments	
+divLists :: [Double] -> [Double] -> [Double]
+divLists xs [] = xs
+divLists [] ys = ys
+divLists (x:xs) (y:ys) = (x / y : divLists xs ys)
+
+maxPace :: [Double] -> Double
+maxPace points = maximum(points)
+
+minPace :: [Double] -> Double
+minPace points = minimum(points)
+
 -- Length of track as (seconds, kms)
 trackLength :: Trkseg -> (Double, Double)
 trackLength (Trkseg segs) = (timeLen, kmLen) where
-    kmLen = sum (map (uncurry segmentLength) segments)
     timeLen = sum (map (uncurry timeDelta) segments)
+    kmLen = sum (map (uncurry segmentLength) segments)
     segments = zip segs (tail segs)
     
-
+--format time in hour : minute: second 
 formatTimeDeltaHMS :: Double -> String
 formatTimeDeltaHMS s =
   show (floor $ s / 60 / 60) ++ ":" ++
@@ -126,19 +150,22 @@ formatTimeDeltaHMS s =
   show (floor s `mod` 60)
 
   
-formatTimeDeltaMPS2KMH :: Double -> String
-formatTimeDeltaMPS2KMH s = show (s * 3.6) --convert mps to kmh
-
 -- output as mins/km  
 formatTimeDeltaMS :: Double -> String
 formatTimeDeltaMS s = show (floor $ s / 60) ++ ":" ++ show (floor s `mod` 60)
-  
+
+--convert double to string for elevation
 formatElevation:: Double -> String
 formatElevation s = show (s)
-  
 
+--convert double to string for min/max pace
+formatPace:: Double -> String
+formatPace s =  show (floor $ s / 60) ++ ":" ++ show (floor s `mod` 60)
+  
+--read the gpx file
 parseGPX :: String -> IOStateArrow s b XmlTree
 parseGPX file = readDocument [ withValidate yes, withRemoveWS yes] file
+
 
 --summarize data for gpx files
 summarizeGPX ::String ->IO ()
@@ -148,16 +175,26 @@ summarizeGPX file = do
  
  let (seconds, lenKm) = trackLength $ head trackSegs
  putStrLn (printf "\n")
- putStrLn (printf "Track distance (km):     %.2f" $ lenKm)
+ putStrLn (printf "Track distance (km):  %.2f" $ lenKm)
  putStrLn (printf "Track duration (h:m:s):  %s" $ formatTimeDeltaHMS seconds)
- putStrLn (printf "Average pace (km/hr):   %.4s" $ formatTimeDeltaMPS2KMH (lenKm/seconds))
- putStrLn (printf "Average pace (mins/km):   %.4s" $ formatTimeDeltaMS (seconds/lenKm))
+ putStrLn (printf "Average pace (mins/km):  %.4s" $ formatTimeDeltaMS (seconds/lenKm))
 
- let (meanelev) = meanElevation $ head [trackPts]
+ let (avgelev) = averageElevation $ head [trackPts]
  let (minelev) = minElevation $ head [trackPts]
  let (maxelev) = maxElevation $ head [trackPts]
- putStrLn (printf "Mean Elevation:  %.6s" $ formatElevation meanelev)
+ putStrLn (printf "Average Elevation:  %.6s" $ formatElevation avgelev)
  putStrLn (printf "Minimum Elevation:  %.6s" $ formatElevation minelev)
  putStrLn (printf "MaximumElevation:  %.6s" $ formatElevation maxelev)
+ 
+ let (timeTrack) = trackTime $ head trackSegs
+ let (distTrack) = trackDist $ head trackSegs
+ let pace = divLists timeTrack distTrack
+
  putStrLn (printf "\n")
+ --putStrLn (printf "Maximum pace :  %s" $ formatPace(timeTrack))
+ putStrLn (printf "Maximum pace :  %s" $ formatPace(maxPace pace))
+ putStrLn (printf "Minimum pace :  %s" $ formatPace(minPace pace))
+ putStrLn (printf "\n")
+
+
   
