@@ -6,7 +6,7 @@ hxt package - ```cabal install hxt```
 For more information go to http://www.fh-wedel.de/~si/HXmlToolbox/index.html
 
 Installation process
-execute ``` ghc gpxParser.hs```  then```./gpxParser ``` on terminal
+execute ``` cabal run```on terminal to start the program
 
 ### More resources
 Similar project at -- https://github.com/nurpax/gpx-utils
