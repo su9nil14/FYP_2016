@@ -19,4 +19,3 @@ https://www.schoolofhaskell.com/school/advanced-haskell/xml-parsing-with-validat
 
 https://www.haskell.org/hoogle/?hoogle=uncurry+%2bbase
 
-http://hackage.haskell.org/package/gps2htmlReport
