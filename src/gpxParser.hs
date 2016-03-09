@@ -3,18 +3,18 @@
 module GPXparser where
 
 import Text.XML.HXT.Core
-import Data.Time(UTCTime,readTime, diffUTCTime)
-import Data.Time.Format(defaultTimeLocale)
-import Data.Text (Text)
-import Text.Printf (printf)
+import Data.Time(UTCTime, diffUTCTime)
+import Data.Time.Format(defaultTimeLocale, parseTimeOrError)
+--import Data.Text (Text)
+--import Text.Printf (printf)
 import Text.Printf
-import System.Environment
+--import System.Environment
 import Data.Tree.NTree.TypeDefs
 --import Graphics.Gnuplot.Simple
 --import System.Console.Haskeline
-import System.Console.CmdArgs.Explicit
-import System.Exit
-import System.IO
+--import System.Console.CmdArgs.Explicit
+--import System.Exit
+--import System.IO
 
 --type Repl a = InputT IO a
 
@@ -32,17 +32,14 @@ data Trkpt = Trkpt
          ,time        :: UTCTime
         }
          deriving (Eq, Ord, Show, Read)
-		 
+
 point :: Latitude -> Longitude -> Double  -> UTCTime -> Trkpt
 point lt lg el tm = Trkpt lt lg el tm
 
 
-  -- derive time and timezone stuffs -- getting error -----  
---In the use of `readTime' (imported from Data.Time, but defined in time-1.6:Data.Time.Format.Parse):
---Deprecated: "use "parseTimeOrError True" instead"
--- this error prevents using ghci
+  -- derive time and timezone stuffs 
 getTime :: String -> UTCTime
-getTime = readTime defaultTimeLocale "%FT%T%Z"
+getTime = parseTimeOrError True defaultTimeLocale "%FT%T%Z"
 
 
 --do deep search on the gpx file
@@ -55,6 +52,7 @@ text = getChildren >>> getText  --get the text value - used to get time and elev
 
 
 --turn the elements into Haskell data, by using the features enabled by the Arrows extension
+getTrkpt :: IOSLA (XIOState () ) XmlTree Trkpt
 getTrkpt = atTag "trkpt" >>>
   proc x -> do
     time_ <- text <<< atTag "time" -< x   --the value of x is sent as an input to the arrow text, and matches its output against time_
@@ -68,7 +66,8 @@ getTrkpt = atTag "trkpt" >>>
       elevation = read ele
       }
 
-----get all the child elements(trkpt(lat,lon),ele,time) inside the root element(trkseg) 
+----get all the child elements(trkpt(lat,lon),ele,time) inside the root element(trkseg)
+getTrkseg:: IOSLA (XIOState () ) XmlTree Trkseg 
 getTrkseg = atTag "trkseg" >>>
   proc x -> do
     trksegments <- listA getTrkpt -< x
@@ -112,12 +111,14 @@ maxElevation points =
             let elevationVals = map (elevation) points
                 theMax = maximum elevationVals
             in theMax
-			
+
+--calculate time between two segments			
 trackTime :: Trkseg -> [Double]
 trackTime (Trkseg segs) = (timeLen) where
     timeLen = (map (uncurry timeDelta) segments)
     segments = (zip segs (tail segs))
-	
+
+--calculate distance between two segments
 trackDist :: Trkseg -> [Double]
 trackDist (Trkseg segs) = (distLen) where
     distLen = (map (uncurry segmentLength) segments)
@@ -129,11 +130,13 @@ divLists xs [] = xs
 divLists [] ys = ys
 divLists (x:xs) (y:ys) = (x / y : divLists xs ys)
 
+--maximum pace in each segments
 maxPace :: [Double] -> Double
-maxPace points = maximum(points)
+maxPace points = minimum(points)
 
+--minimum pace in each segments
 minPace :: [Double] -> Double
-minPace points = minimum(points)
+minPace points = maximum( filter (<1000) points)
 
 -- Length of track as (seconds, kms)
 trackLength :: Trkseg -> (Double, Double)
@@ -152,15 +155,15 @@ formatTimeDeltaHMS s =
   
 -- output as mins/km  
 formatTimeDeltaMS :: Double -> String
-formatTimeDeltaMS s = show (floor $ s / 60) ++ ":" ++ show (floor s `mod` 60)
+formatTimeDeltaMS s = show ( floor $ s / 60) ++ ":" ++ show (floor s `mod` 60)
 
 --convert double to string for elevation
 formatElevation:: Double -> String
-formatElevation s = show (s)
+formatElevation s = show (floor $ s)
 
 --convert double to string for min/max pace
 formatPace:: Double -> String
-formatPace s =  show (floor $ s / 60) ++ ":" ++ show (floor s `mod` 60)
+formatPace s =  show ( floor $ s / 60) ++ ":" ++ show (floor s `mod` 60)
   
 --read the gpx file
 parseGPX :: String -> IOStateArrow s b XmlTree
@@ -175,26 +178,23 @@ summarizeGPX file = do
  
  let (seconds, lenKm) = trackLength $ head trackSegs
  putStrLn (printf "\n")
- putStrLn (printf "Track distance (km):  %.2f" $ lenKm)
- putStrLn (printf "Track duration (h:m:s):  %s" $ formatTimeDeltaHMS seconds)
- putStrLn (printf "Average pace (mins/km):  %.4s" $ formatTimeDeltaMS (seconds/lenKm))
-
- let (avgelev) = averageElevation $ head [trackPts]
- let (minelev) = minElevation $ head [trackPts]
- let (maxelev) = maxElevation $ head [trackPts]
- putStrLn (printf "Average Elevation:  %.6s" $ formatElevation avgelev)
- putStrLn (printf "Minimum Elevation:  %.6s" $ formatElevation minelev)
- putStrLn (printf "MaximumElevation:  %.6s" $ formatElevation maxelev)
+ putStrLn (printf "Track distance (km) :  %.2f" $ lenKm)
+ putStrLn (printf "Track duration (h:m:s) :  %s" $ formatTimeDeltaHMS seconds)
+ putStrLn (printf "\n")
  
  let (timeTrack) = trackTime $ head trackSegs
  let (distTrack) = trackDist $ head trackSegs
  let pace = divLists timeTrack distTrack
 
+ putStrLn (printf "Average pace (mins/km) :  %.5s" $ formatTimeDeltaMS (seconds/lenKm))
+ putStrLn (printf "Maximum pace (mins/km) :  %.5s" $ formatPace(maxPace pace))
+ putStrLn (printf "Minimum pace (mins/km) :  %.5s" $ formatPace(minPace pace))
  putStrLn (printf "\n")
- --putStrLn (printf "Maximum pace :  %s" $ formatPace(timeTrack))
- putStrLn (printf "Maximum pace :  %s" $ formatPace(maxPace pace))
- putStrLn (printf "Minimum pace :  %s" $ formatPace(minPace pace))
+ 
+ let (avgelev) = averageElevation $ head [trackPts]
+ let (minelev) = minElevation $ head [trackPts]
+ let (maxelev) = maxElevation $ head [trackPts]
+ putStrLn (printf "Average Elevation (MSL):  %s" $ formatElevation avgelev)
+ putStrLn (printf "Minimum Elevation(MSL):  %s" $ formatElevation minelev)
+ putStrLn (printf "Maximum Elevation(MSL):  %s" $ formatElevation maxelev)
  putStrLn (printf "\n")
-
-
-  
