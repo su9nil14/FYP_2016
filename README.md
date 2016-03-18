@@ -8,8 +8,10 @@ For more information go to http://www.fh-wedel.de/~si/HXmlToolbox/index.html
 Installation process
 cd to src folder and execute ```ghc Main.hs``` or ```ghci Main.hs```on terminal to start the program
 
-### Usage. 
+### Usage
+
 Main.exe [command] 
+
 "s - Summarizing GPX file"
 "? - Get this help message"
 "q - Quit the program"
