@@ -9,7 +9,7 @@ import Data.Time.Format(defaultTimeLocale, parseTimeOrError)
 import Text.Printf
 import Data.Tree.NTree.TypeDefs
 --import Graphics.Gnuplot.Simple
-import Graphics.EasyPlot
+--import Graphics.EasyPlot
 
 --import Data.Time.Clock
 --import Data.Time.Calendar
@@ -18,6 +18,7 @@ import Graphics.EasyPlot
 
 data Trkseg = Trkseg [Trkpt] 
             deriving (Eq, Ord, Show, Read)
+
 
 type Latitude = Double
 type Longitude = Double
@@ -178,12 +179,6 @@ partitionSeg n xs = (take n xs) : (partitionSeg n (drop n xs))
 
 
 
---get the 1km segment
---get1kmSegment :: Trkseg -> [Double]
---get1kmSegment (Trkseg segs) = (oneKmseg) where
---  oneKmseg = (filter( = 1000) segments)
---  segments = sum(trackDist segs)
-
 
 -- locate slowest and fast 1km segments in the data
 
@@ -245,7 +240,7 @@ parseGPX file = readDocument [ withValidate yes, withRemoveWS yes] file
 
 
 --summarize data for gpx files
-summarizeGPX ::String ->IO ()
+summarizeGPX :: String -> IO ()
 summarizeGPX file = do
  trackSegs <- runX (parseGPX file >>> getTrkseg)
  trackPts <- runX (parseGPX file >>> getTrkpt)
@@ -257,7 +252,7 @@ summarizeGPX file = do
  putStrLn (printf "\n")
  putStrLn (printf "Track distance    (km) :  %.2f" $ lenKm)
  putStrLn (printf "Track duration (h:m:s) :  %s"   $ formatTimeDeltaHMS seconds)
- putStrLn (printf "\n")
+ --putStrLn (printf "\n")
  
 
 -- average minimum and maximum pace
@@ -265,17 +260,15 @@ summarizeGPX file = do
  putStrLn (printf "Average pace (mins/km) :  %.5s" $ formatTimeDeltaMS (seconds/lenKm))
  putStrLn (printf "Maximum pace (mins/km) :  %.5s" $ formatPace(maxPace pace))
  putStrLn (printf "Minimum pace (mins/km) :  %.5s" $ formatPace(minPace pace))
- putStrLn (printf "\n")
+ --putStrLn (printf "\n")
  
 
 -- average minimum and maximum elevation
  let (avgelev, minelev, maxelev) = getAvgMinMaxElevation $ head [trackPts]
- putStrLn (printf "Average Elevation(MSL):  %s" $ formatElevation avgelev)
- putStrLn (printf "Minimum Elevation(MSL):  %s" $ formatElevation minelev)
- putStrLn (printf "Maximum Elevation(MSL):  %s" $ formatElevation maxelev)
- putStrLn (printf "\n")
-
-  
+ putStrLn (printf "Average Elevation(MSL) :  %s"   $ formatElevation avgelev)
+ putStrLn (printf "Minimum Elevation(MSL) :  %s"   $ formatElevation minelev)
+ putStrLn (printf "Maximum Elevation(MSL) :  %s"   $ formatElevation maxelev)
+ putStrLn (printf "--------------------------------------------------------")
 
 
 
