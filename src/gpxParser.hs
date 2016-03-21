@@ -134,19 +134,23 @@ diffElevation :: Num a => [a] -> [a]
 diffElevation (_:[]) = []
 diffElevation (point:points) = (head points - point) : diffElevation points
 
-descent (_:[]) = []
-descent points = positive where
+
+--filter the positive values from the list
+positiveClimb :: [Trkpt] -> [Elevation]
+positiveClimb (_:[]) = []
+positiveClimb points = positive where
   positive = (filter (>0) difference)
   difference = diffElevation (getElevation points)
 
---totalClimb :: 
-totalClimb points = (kmClimb) where
-    kmClimb = sum (descent points)
 
---totalClimb [] = []
---totalClimb points = climb where
---  climb = (filter (>0) diffElev)
---  diffElev = diffElevation (getElevation points)
+totalClimb :: [Trkpt] -> Elevation
+totalClimb points = (kmClimb) where
+    kmClimb = sum (positiveClimb points)
+
+--0.01 convert climb to flat
+adjustedDistance kmLen climbLen = (adjustedLen) where
+  adjustedLen = kmLen + (climbLen * 0.01)
+
 
 
 
@@ -294,7 +298,11 @@ summarizeGPX file = do
 
 
  let (climb) = totalClimb $ head [trackPts]
- putStrLn (printf "Total Climb (m) :         %s"   $ roundNumbers climb)
+ putStrLn (printf "Total Climb (m)        :  %s"   $ roundNumbers climb)
+
+
+ let (adjustedKm) = adjustedDistance lenKm climb
+ putStrLn (printf "Adjusted flat distance :  %.2f" $ adjustedKm)
  putStrLn (printf "--------------------------------------------------------")
 
 
