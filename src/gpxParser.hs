@@ -126,6 +126,29 @@ getAvgMinMaxElevation points = (avgElev, minElev, maxElev) where
   minElev = minElevation points
   maxElev = maxElevation points
 
+getElevation :: [Trkpt] -> [Elevation]
+getElevation = map(\point -> elevation point)
+
+--calculate difference between two elevation points
+diffElevation :: Num a => [a] -> [a]
+diffElevation (_:[]) = []
+diffElevation (point:points) = (head points - point) : diffElevation points
+
+descent (_:[]) = []
+descent points = positive where
+  positive = (filter (>0) difference)
+  difference = diffElevation (getElevation points)
+
+--totalClimb :: 
+totalClimb points = (kmClimb) where
+    kmClimb = sum (descent points)
+
+--totalClimb [] = []
+--totalClimb points = climb where
+--  climb = (filter (>0) diffElev)
+--  diffElev = diffElevation (getElevation points)
+
+
 
 --calculate time between two segments and return a list	of times	
 trackTime :: Trkseg -> [Double]
@@ -220,8 +243,8 @@ formatTimeDeltaMS s = show ( round $ s / 60) ++ ":" ++ show (round s `mod` 60)
 
 
 --convert double to string for elevation
-formatElevation:: Double -> String
-formatElevation s = show (round $ s)
+roundNumbers:: Double -> String
+roundNumbers s = show (round $ s)
 
 
 --convert (time,double) to string for elevation over time
@@ -265,11 +288,14 @@ summarizeGPX file = do
 
 -- average minimum and maximum elevation
  let (avgelev, minelev, maxelev) = getAvgMinMaxElevation $ head [trackPts]
- putStrLn (printf "Average Elevation(MSL) :  %s"   $ formatElevation avgelev)
- putStrLn (printf "Minimum Elevation(MSL) :  %s"   $ formatElevation minelev)
- putStrLn (printf "Maximum Elevation(MSL) :  %s"   $ formatElevation maxelev)
- putStrLn (printf "--------------------------------------------------------")
+ putStrLn (printf "Average Elevation(MSL) :  %s"   $ roundNumbers avgelev)
+ putStrLn (printf "Minimum Elevation(MSL) :  %s"   $ roundNumbers minelev)
+ putStrLn (printf "Maximum Elevation(MSL) :  %s"   $ roundNumbers maxelev)
 
+
+ let (climb) = totalClimb $ head [trackPts]
+ putStrLn (printf "Total Climb (m) :         %s"   $ roundNumbers climb)
+ putStrLn (printf "--------------------------------------------------------")
 
 
  --let (points) = latLonTimePoints $ head [trackPts]
