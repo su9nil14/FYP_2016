@@ -13,13 +13,17 @@ import Data.Tree.NTree.TypeDefs
 import Data.Maybe
 import System.IO
 import Control.Monad
-import Text.Tabular
-import qualified Text.Tabular.AsciiArt as A
-import qualified Text.Tabular.SimpleText as S
+import Data.List
 
 
 data Trkseg = Trkseg [Trkpt] 
             deriving (Eq, Ord, Show, Read)
+
+---- a type for records
+--data T = T { distance  :: Float
+--           , duration :: String
+--           , averagePace :: String }
+--    deriving Show
 
 
 type Latitude = Double
@@ -302,6 +306,9 @@ formatTimeDeltaHMS s =
 formatTimeDeltaMS :: Double -> String
 formatTimeDeltaMS s = show ( round $ s / 60) ++ ":" ++ show (round s `mod` 60)
 
+--formatDistance :: Double -> String
+formatDistance x n = (fromIntegral (round (x * t))) / t
+    where t = 10^n
 
 --convert double to string for elevation
 roundNumbers:: Double -> String
@@ -314,7 +321,7 @@ formatElevationOverTimePoints s = show (s)
 
 
 --convert double to string for min/max pace
-formatPace:: Double -> String
+formatPace:: (Double) -> String
 formatPace s =  show ( round $ s / 60) ++ ":" ++ show (round s `mod` 60)
 
 
@@ -328,20 +335,8 @@ parseGPX file = readDocument [ withValidate yes, withRemoveWS yes] file
 --  withFile filename WriteMode $ \h ->
 --     let writeLine = hPrintf h $ "%." ++ show ap ++ "g\t%." ++ show bp ++ "s\n" in
 --       zipWithM_ writeLine a b
-tableFormat = Table
-  (Group SingleLine
-     [ Group NoLine [Header "Test 1", Header "Test 2"]
-     , Group NoLine [Header "Test 3", Header "Test 4"]
-     ])
-  (Group DoubleLine
-     [ Group SingleLine [Header "Track Distance", Header "Track Duration"]
-     , Group SingleLine [Header "Average Pace", Header "Average Elevation"]
-     , Group SingleLine [Header "Total Climb", Header "Adjusted Flat Distance"]
-     ])
-  [ ["_", "_", "_", "_", "_", "_"]
-  ,["_", "_", "_", "_", "_", "_"]
-  ,["_", "_", "_", "_", "_", "_"]
-  ] 
+
+
 
 --summarize data for gpx files
 summarizeGPX :: String -> IO ()
@@ -394,7 +389,15 @@ summarizeGPX file = do
  --writeFile "summary.txt" $ show $ lenKm
  --writeData "summary.txt" [lenKm] [formatTimeDeltaHMS seconds] 2 7
 
- writeFile "summary.txt"  $ A.render id id id tableFormat
+ --writeFile "summary.txt"  $ A.render id id id tableFormat
+ --writeFile "sample1.tab"  $ S.render "\t" id id id tableFormat
+ let distance = formatDistance lenKm 2 
+ let paceval = formatTimeDeltaMS (seconds/lenKm)
+ let duration = formatTimeDeltaHMS seconds
+ let avgElevation = roundNumbers avgelev
+ let totalclimb = roundNumbers climb
+ writeFile "summary.txt"  $ "Distance\t" ++"Duration\t" ++ "Average Pace\t" ++ "Average Elevation\t" ++ "Total Climb\n" ++ 
+   show distance ++ "\t\t| " ++duration ++ "\t| " ++ paceval ++ "\t\t| " ++avgElevation ++ "\t\t\t| " ++totalclimb
 
 
 
