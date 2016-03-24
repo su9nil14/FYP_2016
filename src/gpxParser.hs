@@ -10,10 +10,12 @@ import Text.Printf
 import Data.Tree.NTree.TypeDefs
 --import Graphics.Gnuplot.Simple
 --import Graphics.EasyPlot
-
---import Data.Time.Clock
---import Data.Time.Calendar
---import Text.XML.XSD.DateTime
+import Data.Maybe
+import System.IO
+import Control.Monad
+import Text.Tabular
+import qualified Text.Tabular.AsciiArt as A
+import qualified Text.Tabular.SimpleText as S
 
 
 data Trkseg = Trkseg [Trkpt] 
@@ -24,6 +26,7 @@ type Latitude = Double
 type Longitude = Double
 type Elevation = Double
 type Time = UTCTime
+type Step = (Double, Double)
 
 --type Pace = Double
 --type Distance = Double
@@ -77,18 +80,29 @@ getTrkseg = atTag "trkseg" >>>
     returnA -< Trkseg trksegments
 
 
--- Haversine's formula for computing the length of a segment expressed in longitude/latitude.
--- From http://www.movable-type.co.uk/scripts/latlong.html
-segmentLength :: Trkpt -> Trkpt -> Double
-segmentLength point_a point_b = radius * c where
-  radius = 6371 -- Earth's mean radius (km)
-  deg2rad x = 2 * pi * x / 360
-  lat1 = deg2rad $ latitude point_a
-  lat2 = deg2rad $ latitude point_b
-  dlat = lat2 - lat1
-  dlon = deg2rad $ longitude point_b - longitude point_a
-  a = (sin dlat/2)^2 + (sin dlon/2)^2 * cos lat1 * cos lat2
-  c = 2 * atan2 (sqrt a) (sqrt (1-a))
+getRadianPair :: Trkpt -> (Double,Double)
+getRadianPair p = (toRadians (latitude p), toRadians (longitude p))
+
+
+toRadians :: Floating f => f -> f
+toRadians = (*) (pi / 180)
+
+
+-- radius of the earth in meters
+radiusOfEarth :: Double
+radiusOfEarth = 6371 -- Earth's mean radius (km) --6378700(m)
+
+
+--get distance beetween two points
+calcDistance :: Trkpt -> Trkpt -> Double
+calcDistance x y =
+  let (lat1,lon1) = getRadianPair x
+      (lat2,lon2) = getRadianPair y
+      deltaLat    = lat2 - lat1
+      deltaLon    = lon2 - lon1
+      a = (sin (deltaLat / 2))^(2::Int) + cos lat1 * cos lat2 * (sin (deltaLon / 2))^(2::Int)
+      c = 2 * atan2 (a**0.5) ((1-a)**0.5)
+  in radiusOfEarth * c
 
 
 --calculate time between two trackpoints
@@ -120,11 +134,13 @@ maxElevation points =
                 theMax = maximum elevationVals
             in theMax
 
+
 getAvgMinMaxElevation :: [Trkpt] -> (Double, Double, Double)
 getAvgMinMaxElevation points = (avgElev, minElev, maxElev) where
   avgElev = averageElevation points
   minElev = minElevation points
   maxElev = maxElevation points
+
 
 getElevation :: [Trkpt] -> [Elevation]
 getElevation = map(\point -> elevation point)
@@ -147,11 +163,15 @@ totalClimb :: [Trkpt] -> Elevation
 totalClimb points = (kmClimb) where
     kmClimb = sum (positiveClimb points)
 
+
 --0.01 convert climb to flat
+adjustedDistance :: Fractional a => a -> a -> a
 adjustedDistance kmLen climbLen = (adjustedLen) where
   adjustedLen = kmLen + (climbLen * 0.01)
 
 
+getSteepness :: Fractional a => a -> a -> a 
+getSteepness climb dist = ((climb * 0.001) / (dist)) * 100
 
 
 --calculate time between two segments and return a list	of times	
@@ -164,7 +184,7 @@ trackTime (Trkseg segs) = (timeLen) where
 --calculate distance between two segments and return a list of distances
 trackDist :: Trkseg -> [Double]
 trackDist (Trkseg segs) = (distLen) where
-    distLen = (map (uncurry segmentLength) segments)
+    distLen = (map (uncurry calcDistance) segments)
     segments = (zip segs (tail segs))
 
 
@@ -192,23 +212,6 @@ maxPace points = minimum(points)
 minPace :: [Double] -> Double
 minPace points = maximum( filter (<1000) points)
 
---creates a list of tuples containing (time,average_speed_at_this_time)
---averageSpeedOverTime :: [Trkpt] -> Double -> Double -> [(LocalTime, Double)] -> [(LocalTime,Double)]
---averageSpeedOverTime [] _ _ _ = []
---averageSpeedOverTime [spd] totalSpeed numPoints iteratedAvr = iteratedAvr ++ [(fst spd, (snd spd + totalSpeed) / (numPoints+1))]
---averageSpeedOverTime (spd:spds) totalSpeed numPoints iteratedAvr = averageSpeedOverTime [spd] totalSpeed numPoints iteratedAvr ++ 
--- averageSpeedOverTime spds (snd spd + totalSpeed) (numPoints+1) iteratedAvr
-
---may need this later on
-partitionSeg :: Int -> [a] -> [[a]]
-partitionSeg _ [] = []
-partitionSeg n xs = (take n xs) : (partitionSeg n (drop n xs))
-
-
-
-
--- locate slowest and fast 1km segments in the data
-
 
 --gives a tuple of (lat,lon,time) --> (54.7148590087891,-8.00872611999512,2010-06-07 11:54:40)
 latLonTimePoints :: [Trkpt] -> [(Latitude, Longitude, LocalTime)]
@@ -219,17 +222,71 @@ latLonTimePoints  = map (\point -> (latitude point, longitude point, utcToLocalT
 elevationTimePoints :: [Trkpt] -> [(LocalTime,Double)]
 elevationTimePoints = map (\point -> (utcToLocalTime diffTime (time point) , elevation point))
 
+
+getTimePoints :: [Trkpt] -> [(LocalTime)]
+getTimePoints = map (\point -> (utcToLocalTime diffTime (time point)))
+
+
+-- x=list  d=target distance  s=distance so far
+splitAtTargetDistance :: [Double] -> Double -> [[Double]]
+splitAtTargetDistance x d  = go x [] 0
+     where go [] _ _ = []
+           go (x:xs) acc s | x+s >= d  = (acc++[x]) : go xs [] 0
+                           | otherwise = go xs (acc++[x]) (s+x)
+
+                        
+merge :: [Double] -> [Double] -> [Double ]
+merge xs     []     = xs
+merge []     ys     = ys
+merge (x:xs) (y:ys) = (x : y : merge xs ys)
+
+
+--get tuple of [(distance, time)]
+trks :: Trkseg -> [Double]
+trks points = merge dist tim where
+  dist = trackDist points
+  tim = trackTime points
+
+
+
+phase1 d ((d0 , t0) : steps) = phase1' d d0 t0 [(d0, t0)] steps
+
+phase1' d distSoFar timeSoFar stepsSoFar steps
+         | distSoFar >= d = Just(timeSoFar, distSoFar)
+         | otherwise = phase1 d ((distSoFar++distSoFar, timeSoFar++timeSoFar) : steps)
+
+
+
+-- locate slowest and fast 1km segments in the data
+--phase1 :: Double -> [Step] -> ([Step], [Step]) -> Maybe ([Step], [Step])
+--phase1 d [] = Nothing
+--phase1 d ((d0 , t0) : steps) = phase1' d d0 t0 [(d0, t0)] steps
+
+--phase1' d distSoFar timeSoFar stepsSoFar steps
+--         | distSoFar >= d = Just(timeSoFar, distSoFar)
+--         | otherwise = phase1 d ((distSoFar++distSoFar, timeSoFar++timeSoFar) : steps)
+
+
+ 
+localTime :: Trkpt -> LocalTime
+localTime dteTime = utcToLocalTime diffTime (time dteTime)
+
 --get the timezone
 diffTime :: TimeZone
 diffTime = TimeZone {timeZoneMinutes=0,timeZoneSummerOnly=False,timeZoneName="GMT"}
 
 
+-- Length of track as (kms)
+totalDistance :: Trkseg -> (Double)
+totalDistance (Trkseg segs) = (kmLen) where
+    kmLen = sum (map (uncurry calcDistance) segments)
+    segments = zip segs (tail segs)
 
--- Length of track as (seconds, kms)
-trackLength :: Trkseg -> (Double, Double)
-trackLength (Trkseg segs) = (timeLen, kmLen) where
+
+-- Length of track as (seconds)
+trackDuration :: Trkseg -> (Double)
+trackDuration (Trkseg segs) = (timeLen) where
     timeLen = sum (map (uncurry timeDelta) segments)
-    kmLen = sum (map (uncurry segmentLength) segments)
     segments = zip segs (tail segs)
 
 
@@ -266,6 +323,26 @@ parseGPX :: String -> IOStateArrow s b XmlTree
 parseGPX file = readDocument [ withValidate yes, withRemoveWS yes] file
 
 
+--write the summary to a text file
+--writeData filename a b ap bp =
+--  withFile filename WriteMode $ \h ->
+--     let writeLine = hPrintf h $ "%." ++ show ap ++ "g\t%." ++ show bp ++ "s\n" in
+--       zipWithM_ writeLine a b
+tableFormat = Table
+  (Group SingleLine
+     [ Group NoLine [Header "Test 1", Header "Test 2"]
+     , Group NoLine [Header "Test 3", Header "Test 4"]
+     ])
+  (Group DoubleLine
+     [ Group SingleLine [Header "Track Distance", Header "Track Duration"]
+     , Group SingleLine [Header "Average Pace", Header "Average Elevation"]
+     , Group SingleLine [Header "Total Climb", Header "Adjusted Flat Distance"]
+     ])
+  [ ["_", "_", "_", "_", "_", "_"]
+  ,["_", "_", "_", "_", "_", "_"]
+  ,["_", "_", "_", "_", "_", "_"]
+  ] 
+
 --summarize data for gpx files
 summarizeGPX :: String -> IO ()
 summarizeGPX file = do
@@ -275,34 +352,52 @@ summarizeGPX file = do
  
 
  -- total distance and time of the track
- let (seconds, lenKm) = trackLength $ head trackSegs
+ let (lenKm) = totalDistance $ head trackSegs
+ let (seconds) = trackDuration $ head trackSegs
  putStrLn (printf "\n")
- putStrLn (printf "Track distance    (km) :  %.2f" $ lenKm)
- putStrLn (printf "Track duration (h:m:s) :  %s"   $ formatTimeDeltaHMS seconds)
+ putStrLn (printf "Track distance    (km)      :  %.2f" $ lenKm)
+ putStrLn (printf "Track duration (h:m:s)      :  %s"   $ formatTimeDeltaHMS seconds)
  --putStrLn (printf "\n")
  
 
 -- average minimum and maximum pace
  let pace = getPace $ head trackSegs
- putStrLn (printf "Average pace (mins/km) :  %.5s" $ formatTimeDeltaMS (seconds/lenKm))
- putStrLn (printf "Maximum pace (mins/km) :  %.5s" $ formatPace(maxPace pace))
- putStrLn (printf "Minimum pace (mins/km) :  %.5s" $ formatPace(minPace pace))
+ putStrLn (printf "Average pace (mins/km)      :  %.5s" $ formatTimeDeltaMS (seconds/lenKm))
+ putStrLn (printf "Maximum pace (mins/km)      :  %.5s" $ formatPace(maxPace pace))
+ putStrLn (printf "Minimum pace (mins/km)      :  %.5s" $ formatPace(minPace pace))
  --putStrLn (printf "\n")
  
 
 -- average minimum and maximum elevation
- let (avgelev, minelev, maxelev) = getAvgMinMaxElevation $ head [trackPts]
- putStrLn (printf "Average Elevation(MSL) :  %s"   $ roundNumbers avgelev)
- putStrLn (printf "Minimum Elevation(MSL) :  %s"   $ roundNumbers minelev)
- putStrLn (printf "Maximum Elevation(MSL) :  %s"   $ roundNumbers maxelev)
+ let (avgelev, minelev, maxelev) = getAvgMinMaxElevation$ head [trackPts]
+ putStrLn (printf "Average Elevation (MSL)     :  %s"   $ roundNumbers avgelev)
+ putStrLn (printf "Minimum Elevation (MSL)     :  %s"   $ roundNumbers minelev)
+ putStrLn (printf "Maximum Elevation (MSL)     :  %s"   $ roundNumbers maxelev)
 
 
  let (climb) = totalClimb $ head [trackPts]
- putStrLn (printf "Total Climb (m)        :  %s"   $ roundNumbers climb)
+ putStrLn (printf "Total Climb (m)             :  %s"   $ roundNumbers climb)
 
 
  let (adjustedKm) = adjustedDistance lenKm climb
- putStrLn (printf "Adjusted flat distance :  %.2f" $ adjustedKm)
+ putStrLn (printf "Adjusted flat distance (km) :  %.2f" $ adjustedKm)
+ 
+
+ let steepness = getSteepness climb lenKm
+ putStrLn (printf "Steepness (percent)         :  %s"   $ roundNumbers steepness)
+
+
+ --let allTracks = trackDist $ head trackSegs
+ --let splittracks = splitAtTargetDistance allTracks
+ --putStrLn (printf "Tracks  :  %s"  $ show splittracks)
+
+ --writeFile "summary.txt" $ show $ lenKm
+ --writeData "summary.txt" [lenKm] [formatTimeDeltaHMS seconds] 2 7
+
+ writeFile "summary.txt"  $ A.render id id id tableFormat
+
+
+
  putStrLn (printf "--------------------------------------------------------")
 
 
