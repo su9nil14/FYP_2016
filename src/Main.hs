@@ -22,15 +22,24 @@ doLoop = do
   case command of
     '?':_ -> do help; doLoop
     'q':_ -> do putStrLn ("Quitting!")
-    's':_-> do summarizeGPXFiles; doLoop
+    'S':_-> do writeGPXFile; doLoop
+    's':_-> do summarizeGPXFile ; doLoop
     _    -> do putStrLn ("Invalid  command"); doLoop
 
+--summarize just the given file
+summarizeGPXFile :: IO()
+summarizeGPXFile = do
+  putStrLn "Enter the filename:"
+  filename <- getLine
+  summarizeGPX filename
 
-summarizeGPXFiles :: IO()
-summarizeGPXFiles = do
+--summarize all the .gpx files it can find in the curently directory
+writeGPXFile :: IO()
+writeGPXFile = do
   gpxFiles <- filesWithExt "." ".gpx"
-  putStrLn ("Summarizing "++show (length gpxFiles)++" gpx file(s)...")
-  forM_ gpxFiles $ \file -> do summarizeGPX file
+  putStrLn ("Summarizing gpx file(s) to summary.txt file")
+  forM_ gpxFiles $ \file -> do summarizeGPXDataToFile file
+
 
 filesWithExt :: FilePath -> String -> IO [String]
 filesWithExt dir ext = do
@@ -40,7 +49,8 @@ filesWithExt dir ext = do
 help :: IO ()
 help = do
   putStrLn "USAGE\n "
-  putStrLn "s - Summarizing GPX file"
+  putStrLn "S - Summarize all GPX file in the directory and write to file"
+  putStrLn "s - Summarize given GPX file"
   putStrLn "? - Get this help message"
   putStrLn "q - Quit the program"
 

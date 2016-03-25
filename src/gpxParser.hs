@@ -14,26 +14,22 @@ import Data.Maybe
 import System.IO
 import Control.Monad
 import Data.List
-
-
-data Trkseg = Trkseg [Trkpt] 
-            deriving (Eq, Ord, Show, Read)
-
----- a type for records
---data T = T { distance  :: Float
---           , duration :: String
---           , averagePace :: String }
---    deriving Show
+import Text.Tabular
+import qualified Text.Tabular.AsciiArt as A
+import qualified Text.Tabular.SimpleText as S
 
 
 type Latitude = Double
 type Longitude = Double
 type Elevation = Double
 type Time = UTCTime
-type Step = (Double, Double)
+type Step = (Double
+            , Double)
 
 --type Pace = Double
 --type Distance = Double
+data Trkseg = Trkseg [Trkpt] 
+            deriving (Eq, Ord, Show, Read)
 
 --define data structure - the child elements
 data Trkpt = Trkpt
@@ -43,6 +39,11 @@ data Trkpt = Trkpt
          ,time      :: Time
         }
          deriving (Eq, Ord, Show, Read)
+
+--data Trk = Trk
+--       { name :: String
+--       }
+--       deriving (Show, Read)
 
 
   -- derive time and timezone stuffs 
@@ -82,6 +83,14 @@ getTrkseg = atTag "trkseg" >>>
   proc x -> do
     trksegments <- listA getTrkpt -< x
     returnA -< Trkseg trksegments
+
+----getNameGPX :: IOSLA (XIOState () ) XmlTree Name
+--getNameGPX = atTag "trk" >>>
+--  proc x -> do
+--    name_ <- text <<< atTag "name" -< x   --the value of x is sent as an input to the arrow text, and matches its output against time_
+--    returnA -< Trk {
+--      name = read name_
+--      }
 
 
 getRadianPair :: Trkpt -> (Double,Double)
@@ -246,29 +255,29 @@ merge (x:xs) (y:ys) = (x : y : merge xs ys)
 
 
 --get tuple of [(distance, time)]
-trks :: Trkseg -> [Double]
-trks points = merge dist tim where
+trks :: Trkseg -> [(Step)]
+trks points = zip dist (tim) where
   dist = trackDist points
   tim = trackTime points
 
 
 
-phase1 d ((d0 , t0) : steps) = phase1' d d0 t0 [(d0, t0)] steps
-
-phase1' d distSoFar timeSoFar stepsSoFar steps
-         | distSoFar >= d = Just(timeSoFar, distSoFar)
-         | otherwise = phase1 d ((distSoFar++distSoFar, timeSoFar++timeSoFar) : steps)
-
-
-
 -- locate slowest and fast 1km segments in the data
---phase1 :: Double -> [Step] -> ([Step], [Step]) -> Maybe ([Step], [Step])
---phase1 d [] = Nothing
---phase1 d ((d0 , t0) : steps) = phase1' d d0 t0 [(d0, t0)] steps
+phase1 :: Double -> [Step] -> Maybe ([Step], [Step])
+phase1 d [] = Nothing
+phase1 d ((d0,t0):steps) = phase1' d d0 t0 [(d0,t0)] steps
 
---phase1' d distSoFar timeSoFar stepsSoFar steps
---         | distSoFar >= d = Just(timeSoFar, distSoFar)
---         | otherwise = phase1 d ((distSoFar++distSoFar, timeSoFar++timeSoFar) : steps)
+phase1' :: Double -> Double -> Double -> [Step] -> [Step] -> Maybe ([Step],[Step])
+phase1' d currD currT walked []
+ | currD < d = Nothing
+ | otherwise = Just (walked,[])
+phase1' d currD currT walked ((dx,tx):steps)
+ | currD' < d = phase1' d currD' currT' walked' steps
+ | otherwise = Just (walked',steps)
+ where
+   currD' = currD + dx
+   currT' = currT + tx
+   walked' = walked++[(dx,tx)]
 
 
  
@@ -330,12 +339,8 @@ parseGPX :: String -> IOStateArrow s b XmlTree
 parseGPX file = readDocument [ withValidate yes, withRemoveWS yes] file
 
 
---write the summary to a text file
---writeData filename a b ap bp =
---  withFile filename WriteMode $ \h ->
---     let writeLine = hPrintf h $ "%." ++ show ap ++ "g\t%." ++ show bp ++ "s\n" in
---       zipWithM_ writeLine a b
-
+--getGPXName :: Trk -> String
+--getGPXName n = name n  
 
 
 --summarize data for gpx files
@@ -343,10 +348,12 @@ summarizeGPX :: String -> IO ()
 summarizeGPX file = do
  trackSegs <- runX (parseGPX file >>> getTrkseg)
  trackPts <- runX (parseGPX file >>> getTrkpt)
+ --gpxName <- runX (parseGPX file >>> getNameGPX)
 --putStrLn (printf "trackpoints:  %s" $ show trackSegs)
  
 
  -- total distance and time of the track
+ --let name_gpx = getGPXName $ head gpxName
  let (lenKm) = totalDistance $ head trackSegs
  let (seconds) = trackDuration $ head trackSegs
  putStrLn (printf "\n")
@@ -376,39 +383,51 @@ summarizeGPX file = do
 
  let (adjustedKm) = adjustedDistance lenKm climb
  putStrLn (printf "Adjusted flat distance (km) :  %.2f" $ adjustedKm)
+ putStrLn (printf "Avg Adjusted Pace (mins/km) :  %.5s" $ formatTimeDeltaMS (seconds/adjustedKm))
  
 
  let steepness = getSteepness climb lenKm
  putStrLn (printf "Steepness (percent)         :  %s"   $ roundNumbers steepness)
 
-
- --let allTracks = trackDist $ head trackSegs
- --let splittracks = splitAtTargetDistance allTracks
- --putStrLn (printf "Tracks  :  %s"  $ show splittracks)
-
- --writeFile "summary.txt" $ show $ lenKm
- --writeData "summary.txt" [lenKm] [formatTimeDeltaHMS seconds] 2 7
-
- --writeFile "summary.txt"  $ A.render id id id tableFormat
- --writeFile "sample1.tab"  $ S.render "\t" id id id tableFormat
- let distance = formatDistance lenKm 2 
- let paceval = formatTimeDeltaMS (seconds/lenKm)
- let duration = formatTimeDeltaHMS seconds
- let avgElevation = roundNumbers avgelev
- let totalclimb = roundNumbers climb
- writeFile "summary.txt"  $ "Distance\t" ++"Duration\t" ++ "Average Pace\t" ++ "Average Elevation\t" ++ "Total Climb\n" ++ 
-   show distance ++ "\t\t| " ++duration ++ "\t| " ++ paceval ++ "\t\t| " ++avgElevation ++ "\t\t\t| " ++totalclimb
-
-
-
+ let tuple = trks $ head trackSegs
+ let bestseg = phase1 2 tuple
+ putStrLn (printf "step         :  %s"   $ show bestseg)
  putStrLn (printf "--------------------------------------------------------")
 
 
- --let (points) = latLonTimePoints $ head [trackPts]
- --putStrLn (printf "Points:  %s" $ show (points)) 
 
- --let (ptEle) = elevationTimePoints $ head [trackPts]
- --putStrLn (printf "distance Elevation points:  %s" $ formatElevationOverTimePoints ptEle)
+--summarize data for gpx files
+summarizeGPXDataToFile :: String -> IO ()
+summarizeGPXDataToFile file = do
+ trackSegs <- runX (parseGPX file >>> getTrkseg)
+ trackPts <- runX (parseGPX file >>> getTrkpt)
+
+ 
+ -- total distance and time of the track
+ let (lenKm) = totalDistance $ head trackSegs
+ let (seconds) = trackDuration $ head trackSegs
+ let (climb) = totalClimb $ head [trackPts]
+
+ let dateTime = getTimePoints $ head [trackPts]
+ let firstdate = head dateTime
+ let distance = formatDistance lenKm 2 
+ let avgpaceval = formatTimeDeltaMS (seconds/lenKm)
+ let duration = formatTimeDeltaHMS seconds
+ let totalclimb = roundNumbers climb
+ let adjustedDist = adjustedDistance lenKm climb
+ let adjustedDistanceRounded = formatDistance adjustedDist 2
+ let adjustedPace = formatTimeDeltaMS (seconds/adjustedDist)
+ 
+ putStrLn (printf $ table firstdate file distance duration avgpaceval totalclimb adjustedDistanceRounded adjustedPace)
+ writeFile "summary.txt" $ table firstdate file distance duration avgpaceval totalclimb adjustedDistanceRounded adjustedPace
+
+
+
+--table :: (Show a, Show a1) => a -> [Char] -> [Char] -> [Char] -> a1 -> [Char] -> [Char]
+table filename fd dt dr ap tc add adp=
+  "Filename  ||DateTime\t\t||Distance  ||Duration  ||Average Pace  ||Total Climb   ||Adjusted Distance  ||Adjusted Pace\n"
+  ++show fd++ "\t  ||"++show filename++ "\t||"++show dt++"\t    ||"++dr++"\t||"++ap++"\t\t||"++tc++"\t\t||"++show add++"\t\t     ||"++adp ++ 
+   "\n------------------------------------------------------------------------------------------------------------------------------"
 
 
 --experiments with plotting
