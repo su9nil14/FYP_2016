@@ -2,10 +2,13 @@
 GPS trace analysis using Haskell
 
 ## Requirements
-hxt package  ```cabal install hxt```
-tabular ```cabal install tabular```
-directory ```cabal install directory```
-html ```cabal install html```
+ hxt package  ```cabal install hxt```
+ 
+ tabular ```cabal install tabular```
+ 
+ directory ```cabal install directory```
+ 
+ html ```cabal install html```
 
 
 Installation process
