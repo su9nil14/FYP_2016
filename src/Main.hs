@@ -3,8 +3,6 @@ module Main (
 ) where
 
 import GPXparser
---import System.Console.CmdArgs.Explicit
---import System.Exit
 import Control.Monad(forM_)
 import Data.List(isSuffixOf)
 import System.Directory (getDirectoryContents)
@@ -17,11 +15,12 @@ main = do
  
 doLoop :: IO () 
 doLoop = do
-  putStrLn "Enter a command. Enter ? for help:"
+  putStrLn "\nEnter a command. Enter ? for help:"
   command <- getLine
   case command of
     '?':_ -> do help; doLoop
     'q':_ -> do putStrLn ("Quitting!")
+    'r' :_ -> do generateHtmlReport; doLoop
     'S':_-> do writeGPXFile; doLoop
     's':_-> do summarizeGPXFile ; doLoop
     _    -> do putStrLn ("Invalid  command"); doLoop
@@ -33,11 +32,18 @@ summarizeGPXFile = do
   filename <- getLine
   summarizeGPX filename
 
+--summarize just the given file
+generateHtmlReport :: IO()
+generateHtmlReport = do
+  gpxFiles <- filesWithExt "." ".gpx"
+  putStrLn ("Summarizing gpx file(s) to summary.html file\n")
+  forM_ gpxFiles $ \file -> do writeHTML file
+
 --summarize all the .gpx files it can find in the curently directory
 writeGPXFile :: IO()
 writeGPXFile = do
   gpxFiles <- filesWithExt "." ".gpx"
-  putStrLn ("Summarizing gpx file(s) to summary.txt file")
+  putStrLn ("Summarizing gpx file(s) to summary.txt file\n")
   forM_ gpxFiles $ \file -> do summarizeGPXDataToFile file
 
 
@@ -49,8 +55,9 @@ filesWithExt dir ext = do
 help :: IO ()
 help = do
   putStrLn "USAGE\n "
-  putStrLn "S - Summarize all GPX file in the directory and write to file"
+  putStrLn "S - Summarize all GPX file in the directory and write to text file"
   putStrLn "s - Summarize given GPX file"
+  putStrLn "r - Summarize all GPX file in the directory and write to HTML file"
   putStrLn "? - Get this help message"
   putStrLn "q - Quit the program"
 
