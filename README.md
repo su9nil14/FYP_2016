@@ -5,7 +5,8 @@ GPS trace analysis using Haskell
 hxt package  ```cabal install hxt```
 tabular ```cabal install tabular```
 directory ```cabal install directory```
-For more information go to http://www.fh-wedel.de/~si/HXmlToolbox/index.html
+html ```cabal install html```
+
 
 Installation process
 cd to src folder and execute ```ghc Main.hs``` or ```ghci Main.hs```on terminal to start the program
