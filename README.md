@@ -8,6 +8,8 @@ GPS trace analysis using Haskell
  
  directory ```cabal install directory```
  
+ filepath ```cabal install filepath```
+
  html ```cabal install html```
 
 
