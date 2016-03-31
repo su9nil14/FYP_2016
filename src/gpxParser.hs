@@ -14,8 +14,6 @@ import Control.Monad
 import Data.List
 import Text.Tabular
 import Text.Html
---import qualified Text.Tabular.AsciiArt as A
---import qualified Text.Tabular.SimpleText as S
 
 
 type Latitude = Double
@@ -254,6 +252,14 @@ trks points = zip dist (tim) where
   dist = trackDist points
   tim = trackTime points
 
+--get time over distance  (datetime,distance_travelled_in_that_time)
+timeOverDistance :: [Trkpt] -> Double -> [(LocalTime,Double)]
+timeOverDistance [] _ = []
+timeOverDistance [x] _ = [(utcToLocalTime diffTime (time x),0.0)]
+timeOverDistance (x:xs) acc = 
+   let dist = calcDistance x (head xs)           
+   in (utcToLocalTime diffTime (time x), dist + acc ) : timeOverDistance xs (dist + acc)
+
 
 
 -- locate slowest and fast 1km segments in the data
@@ -413,10 +419,10 @@ summarizeGPXDataToFile file = do
  let adjustedPace = formatTimeDeltaMS (seconds/adjustedDist)
 
  let finalStrings = tableFormat firstdate file distance duration avgpaceval totalclimb adjustedDistanceRounded adjustedPace
+ let path =  ("reportsTxt/"++file)
 
  putStrLn (printf $ finalStrings)
- writeFile "summary.txt" $ printf $ finalStrings
- --writeFile "summary.txt" $ finalStrings
+ writeFile (path++".txt") $ finalStrings 
 
 
 
@@ -428,7 +434,6 @@ tableFormat filename fd dt dr ap tc add adp=
 
 
 
-
 -- Takes all the Tracksegments and generates the HTML report
 --generateHtmlPage :: Trkseg -> Html
 generateHtmlPage file point segs = 
@@ -437,7 +442,7 @@ generateHtmlPage file point segs =
        title = thetitle $ stringToHtml ("GPX Summary Data"++file++"")
        theStyle = style (stringToHtml cssContent) ! [thetype "text/css"]
        theHeader = header $ concatHtml [title,theStyle]
-       mainArea = thediv (concatHtml [header1,(statsTable point segs),br])
+       mainArea = thediv (concatHtml [header1,(statsTable point segs),br,chartTable])
        theBody = body mainArea
    in concatHtml [theHeader,theBody,pageFooter]
 
@@ -492,7 +497,15 @@ cssContent = "h1 {color: #2C558A; font-weight: normal; font-size: x-large; "++
   "table {border-spacing: 20px 0px;} footer {text-align:right; "++
   "background-color:#EEEEEE; width:900px; margin:0 auto; margin-top: 30px} "
 
-
+-- | The area holding the Cairo charts
+chartTable = 
+   let img1 = image ! [src "elevationTime.png"]
+       img2 = image ! [src "chart2.png"]
+       cell1 =  td img1
+       cell2 = td img2
+       row1 = tr $ concatHtml [cell1,cell2]
+       tbl = table row1
+   in center tbl
 --The footer
 pageFooter = 
    let projectLink = anchor (stringToHtml "Source files available at Github") ! [href "https://github.com/su9nil14/FYP_2016"]
@@ -501,10 +514,3 @@ pageFooter =
 
 
 footer = tag "FOOTER"
-
-
-
-writeHTML file = do
-  [trackSegs] <- runX (parseGPX file >>> getTrkseg)
-  trackPts <- runX (parseGPX file >>> getTrkpt)
-  writeFile ("summary.html") (renderHtml $ generateHtmlPage file trackPts trackSegs)

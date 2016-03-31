@@ -5,7 +5,10 @@ module Main (
 import GPXparser
 import Control.Monad(forM_)
 import Data.List(isSuffixOf)
-import System.Directory (getDirectoryContents)
+import Text.XML.HXT.Core
+import Text.Html
+import System.FilePath
+import System.Directory
 import System.IO
 
 main :: IO ()
@@ -21,7 +24,7 @@ doLoop = do
     '?':_ -> do help; doLoop
     'q':_ -> do putStrLn ("Quitting!")
     'r' :_ -> do generateHtmlReport; doLoop
-    'S':_-> do writeGPXFile; doLoop
+    'S':_-> do summarizeAllGPXFile; doLoop
     's':_-> do summarizeGPXFile ; doLoop
     _    -> do putStrLn ("Invalid  command"); doLoop
 
@@ -32,25 +35,38 @@ summarizeGPXFile = do
   filename <- getLine
   summarizeGPX filename
 
---summarize just the given file
-generateHtmlReport :: IO()
+--summarize all the .gpx files it can find in the curently directory to txt file
+--summarizeAllGPXFile :: IO()
+summarizeAllGPXFile = do
+  curDir <- getCurrentDirectory
+  allFiles <- getDirectoryContents curDir
+  let allFilesSplit = map splitExtension allFiles
+  let gpxFiles = filter (\(_,b) -> b==".gpx") allFilesSplit
+  putStrLn ("Processing "++show (length gpxFiles)++" file(s)...")
+  mapM (\(a,b) -> summarizeGPXDataToFile (a++b) ) gpxFiles
+
+
+
+--summarize all the .gpx files it can find in the curently directory in html format
+--generateHtmlReport :: IO()
 generateHtmlReport = do
-  gpxFiles <- filesWithExt "." ".gpx"
-  putStrLn ("Summarizing gpx file(s) to summary.html file\n")
-  forM_ gpxFiles $ \file -> do writeHTML file
-
---summarize all the .gpx files it can find in the curently directory
-writeGPXFile :: IO()
-writeGPXFile = do
-  gpxFiles <- filesWithExt "." ".gpx"
-  putStrLn ("Summarizing gpx file(s) to summary.txt file\n")
-  forM_ gpxFiles $ \file -> do summarizeGPXDataToFile file
+  curDir <- getCurrentDirectory
+  allFiles <- getDirectoryContents curDir
+  let allFilesSplit = map splitExtension allFiles
+  let gpxFiles = filter (\(_,b) -> b==".gpx") allFilesSplit
+  putStrLn ("Processing "++show (length gpxFiles)++" file(s)...")
+  mapM (\(a,b) -> writeHtmlReport (a++b) ) gpxFiles
 
 
-filesWithExt :: FilePath -> String -> IO [String]
-filesWithExt dir ext = do
-  contents <- getDirectoryContents dir
-  return $ filter (isSuffixOf ext) contents
+writeHtmlReport gpxFile = do
+  points <- runX (parseGPX gpxFile >>> getTrkpt)
+  [segs] <- runX (parseGPX gpxFile >>> getTrkseg)
+
+  let path =  ("reportsHtml/"++gpxFile)
+  putStrLn "Generating report..." 
+  writeFile (path++".html") (renderHtml $ generateHtmlPage gpxFile points segs)
+  putStrLn $ gpxFile ++" processed. Report saved in: "++path
+
   
 help :: IO ()
 help = do
