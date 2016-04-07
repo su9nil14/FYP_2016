@@ -39,6 +39,12 @@ data Trackpoint = Trackpoint
         }
          deriving (Eq, Ord, Show, Read)
 
+--data Step == Step
+--       { distance :: Double
+--        ,pace     :: Double
+--       }
+--         deriving (Show)
+
 
 -- derive time and timezone stuffs 
 getTime :: String -> UTCTime
@@ -188,7 +194,7 @@ getAvgMinMaxElevation points = (avgElev, minElev, maxElev) where
 
 
 --calculate difference between two elevation points
-diffElevation :: Num a => [a] -> [a]
+diffElevation :: [Double] -> [Double]
 diffElevation (_:[]) = []
 diffElevation (point:points) = (head points - point) : diffElevation points
 
@@ -206,7 +212,7 @@ totalClimb points = (kmClimb) where
     kmClimb = sum (positiveClimb points)
 
 
-getSteepness :: Fractional a => a -> a -> a 
+getSteepness :: Double -> Double -> Double 
 getSteepness climb dist = ((climb * 0.001) / (dist)) * 100
 
 
@@ -231,18 +237,19 @@ minPace :: [Double] -> Double
 minPace points = maximum( filter (<1000) points)
 
 
+
 -- locate slowest and fast 1km segments in the data
-phase1 :: Double -> [Step] -> Maybe ([Step], [Step])
+phase1 :: Double -> [Step] ->  Maybe([Step])
 phase1 d [] = Nothing
 phase1 d ((d0,t0):steps) = phase1' d d0 t0 [(d0,t0)] steps
 
-phase1' :: Double -> Double -> Double -> [Step] -> [Step] -> Maybe ([Step],[Step])
+phase1' :: Double -> Double -> Double -> [Step] -> [Step] ->  Maybe([Step])
 phase1' d currD currT walked []
  | currD < d = Nothing
- | otherwise = Just (walked,[])
+ | otherwise =  Just(walked)
 phase1' d currD currT walked ((dx,tx):steps)
  | currD' < d = phase1' d currD' currT' walked' steps
- | otherwise = Just (walked',steps)
+ | otherwise =  Just(walked')
  where
    currD' = currD + dx
    currT' = currT + tx
@@ -348,19 +355,108 @@ parseGPX :: String -> IOStateArrow s b XmlTree
 parseGPX file = readDocument [ withValidate yes, withRemoveWS yes] file
 
 
--- Length of track as (seconds)
---tracks :: Tracksegment -> (Double, Double)
-tracks segs = zip dist (tim) where
-  dist = trackDist segs
-  tim = trackTime segs
+
+-------------------------------------------------------find fastest segment--------------------------------------------------
+phase2 :: Double -> [Step] -> [Maybe [Step]]
+phase2 d [] =  []
+phase2 d list = 
+ let dsegs1 = phase1 d list
+     dsegs2 = [dsegs1] ++ phase2 d (tail list)
+ in  dsegs2
+
+
+
+--same one as above but shorter
+phase2Alt :: Double -> [Step] -> [Maybe [Step]]
+phase2Alt d [] = []
+phase2Alt d tracks =  map (phase1 d) (tails tracks)
+
+
+--add only the times values from the list of steps
+addSndItem :: Maybe([Step]) -> Double
+addSndItem list
+ | length list < 1 = 0.0
+ | otherwise = result
+ where
+   result = sum nums
+   nums = map snd (fromJust list)
+
+
+addSndItem' :: [Maybe ([Step])] -> [Double]
+addSndItem' [] = []
+addSndItem' list = map (addSndItem) (head (tails list))
+
+
+getFastestPace :: [Double] -> Double
+getFastestPace list = minimum (filter (>0) list) 
+
+
+printSteps :: Maybe ([Step]) -> String
+printSteps s = show $ s
 
 
 --main :: IO ()
-main = do
-  --[trackSegs] <- runX (parseGPX "eg.gpx" >>> getTrkseg)
-  trackPts <- runX (parseGPX "eg.gpx" >>> getTrkpt)
+--main = do
+--  [trackSegs] <- runX (parseGPX "1.gpx" >>> getTrkseg)
+--  trackPts <- runX (parseGPX "1.gpx" >>> getTrkpt)
 
-  let [trkss] = timeOverDistance trackPts 0.0
-  putStrLn("tracks" ++ show trkss)
+
+
+----flow of phase2
+--  let tracks = trks trackSegs              --[(1.0,1.0), (2.0,2.0), (3.0,3.0), (1.0,4.0), (2.0,5.0), (2.0,6.0), (1.0,7.0), (2.0,8.0), (1.0,9.0), (2.0,10.0)]
+--  let result = phase2Alt 5.0 tracks
+--  --putStrLn(show result)
+--  let result' = addSndItem' result
+--  putStrLn(formatTimeDeltaMS(getFastestPace result'))
+--  --putStrLn(show $ result')
+  
+
+
+
+
+  --putStrLn(show $ addSndItem $ head result)
+  --putStrLn(show $ addSndItem $ head (tail result))
+  --putStrLn(show $ addSndItem $ head (tail (tail result)))
+  --putStrLn(show $ addSndItem $ head (tail (tail (tail result))))
+  --putStrLn(show $ addSndItem $ head (tail (tail (tail (tail result)))))
+  --putStrLn(show $ addSndItem $ head (tail (tail (tail (tail (tail result))))))
+  --putStrLn(show $ addSndItem $ head (tail (tail (tail (tail (tail (tail result)))))))
+  --putStrLn(show $ addSndItem $ head (tail (tail (tail (tail (tail (tail (tail result))))))))
+  --putStrLn(show $ addSndItem $ head (tail (tail (tail (tail (tail (tail (tail (tail result)))))))))
+
+
+  -- desired flow of phase2
+  --let jseg0 = phase1 5.0 tracks
+  --    jseg1 = phase1 5.0 (tail tracks)
+  --    jseg2 = phase1 5.0 (tail(tail tracks))
+  --    jseg3 = phase1 5.0 (tail(tail(tail tracks)))
+  --    jseg4 = phase1 5.0 (tail(tail(tail(tail tracks))))
+  --    jseg5 = phase1 5.0 (tail(tail(tail(tail(tail(tracks))))))
+  --    jseg6 = phase1 5.0 (tail(tail(tail(tail(tail(tail tracks))))))
+  --    jseg7 = phase1 5.0 (tail(tail(tail(tail(tail(tail(tail tracks)))))))
+  --    jseg8 = phase1 5.0 (tail(tail(tail(tail(tail(tail(tail(tail tracks))))))))
+
+  --putStrLn(printSteps jseg0)     -- -->  Just [(1.0,1.0),(2.0,2.0),(3.0,3.0)]
+  --putStrLn(printSteps jseg1)     -- -->  Just [(2.0,2.0),(3.0,3.0)]
+  --putStrLn(printSteps jseg2)     -- -->  Just [(3.0,3.0),(1.0,4.0),(2.0,5.0)]
+  --putStrLn(printSteps jseg3)     -- -->  Just [(1.0,4.0),(2.0,5.0),(2.0,6.0)]
+  --putStrLn(printSteps jseg4)     -- -->  Just [(2.0,5.0),(2.0,6.0),(1.0,7.0)]
+  --putStrLn(printSteps jseg4)     -- -->  Just [(2.0,5.0),(2.0,6.0),(1.0,7.0)]
+  --putStrLn(printSteps jseg5)     -- -->  Just [(2.0,6.0),(1.0,7.0),(2.0,8.0)]
+  --putStrLn(printSteps jseg6)     -- -->  Just [(1.0,7.0),(2.0,8.0),(1.0,9.0),(2.0,10.0)]
+  --putStrLn(printSteps jseg7)     -- -->  Just [(2.0,8.0),(1.0,9.0),(2.0,10.0)]
+  --putStrLn(printSteps jseg8)     -- -->  Nothing
+
+--actual result from phase2
+--[Just [(1.0,1.0),(2.0,2.0),(3.0,3.0)],             --6
+  --Just [(2.0,2.0),(3.0,3.0)],                      --5
+  --Just [(3.0,3.0),(1.0,4.0),(2.0,5.0)],            --12
+  --Just [(1.0,4.0),(2.0,5.0),(2.0,6.0)],            --15
+  --Just [(2.0,5.0),(2.0,6.0),(1.0,7.0)],            --18
+  --Just [(2.0,6.0),(1.0,7.0),(2.0,8.0)],            --21
+  --Just [(1.0,7.0),(2.0,8.0),(1.0,9.0),(2.0,10.0)], --34
+  --Just [(2.0,8.0),(1.0,9.0),(2.0,10.0)],           --27
+  --Nothing,Nothing,Nothing]
+
 
 

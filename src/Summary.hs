@@ -109,10 +109,12 @@ statsTable :: [Trackpoint] -> Tracksegment -> Html --Date-Time, FileName Distanc
 statsTable point segs = 
    let tblHeader1 = th $ stringToHtml "Journey Details"
        tblHeader2 = th $ stringToHtml "Elevation Data"
-       tblHeader3 = th $ stringToHtml "Pace Values"
+       tblHeader3 = th $ stringToHtml "Performance"
 
        lenKm = totalDistance segs
        seconds = trackDuration segs
+       paceVal = getPace segs
+
        climb = totalClimb point
        dateTime = getTimePoints point
        firstdate = head dateTime
@@ -125,21 +127,28 @@ statsTable point segs =
        adjustedPace = formatTimeDeltaMS (seconds/adjustedDist)
        (avgelev, minelev, maxelev) = getAvgMinMaxElevation point
 
+       adjustedPaceVal = formatTimeDeltaMS (seconds/adjustedDist)
+
+
        dateCol1 = li $ stringToHtml ("Date & Time : "++ show firstdate)
        distCol1 = li $ stringToHtml ("Distance (km) : "++ show distance)
        durCol1 = li $ stringToHtml ("Duration (h:m:s): "++ duration)
-       adjDistCol1 = li $ stringToHtml ("Adjusted Distance (km): "++ show adjustedDistanceRounded)
 
        elevCol1 = li $ stringToHtml ("Total Climb (m): "++ totalclimb)
        elevCol2 = li $ stringToHtml ("Maximum Elevation (m): "++ roundNumbers maxelev)
        elevCol3 = li $ stringToHtml ("Minimum Elevation (m): "++ roundNumbers minelev)
       
        paceCol31 = li $ stringToHtml ("Average Pace (mins/km): "++ avgpaceval)
-       paceCol32 = li $ stringToHtml ("Adjusted Pace (mins/km): "++  adjustedPace)
+       paceCol32 = li $ stringToHtml ("Max Pace (mins/km): "++  formatPace(maxPace paceVal))
+       paceCol33 = li $ stringToHtml ("Min Pace (mins/km): "++ formatPace(minPace paceVal))
+       sepCol34 = li $ stringToHtml ("_________________________")
+       paceCol34 = li $ stringToHtml ("Adjusted Pace (mins/km): "++ adjustedPaceVal)
+       adjDistCol34 = li $ stringToHtml ("Adjusted Distance (km): "++ show adjustedDistanceRounded)
 
-       col1 = td (concatHtml [dateCol1,distCol1,durCol1,adjDistCol1]) ! [valign "top"]
+
+       col1 = td (concatHtml [dateCol1,distCol1,durCol1]) ! [valign "top"]
        col2 = td  (concatHtml [elevCol1,elevCol2,elevCol3]) ! [valign "top"]
-       col3 = td  (concatHtml [paceCol31,paceCol32]) ! [valign "top"]
+       col3 = td  (concatHtml [paceCol31,paceCol32,paceCol33,sepCol34,paceCol34,adjDistCol34]) ! [valign "top"]
        row1 = tr $ concatHtml [tblHeader1,tblHeader2,tblHeader3]
        row2 = tr $ concatHtml [col1,col2,col3]
        tbl = table (concatHtml [row1,row2])
