@@ -17,12 +17,17 @@ Installation process
 cd to src folder and execute ```ghc Main.hs``` or ```ghci Main.hs```on terminal to start the program
 
 ### Usage
+```USAGE  [COMMAND]
 
-Main.exe [command] 
-
-"s - Summarizing GPX file"
-"? - Get this help message"
-"q - Quit the program"
+   S - Summarize all GPX file in the directory to terminal and write to text file
+   
+   s - Summarize given GPX file to terminal
+   
+   r - Summarize all GPX file in the directory and write to HTML file
+   
+   ? - Get this help message
+   
+   q - Quit the program ```
 
 #### More resources
 Similar project at -- https://github.com/nurpax/gpx-utils
