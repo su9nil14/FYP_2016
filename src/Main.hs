@@ -11,6 +11,7 @@ import Text.Html
 import System.FilePath
 import System.Directory
 import System.IO
+--import System(getArgs)
 
 
 main :: IO ()
@@ -28,7 +29,21 @@ doLoop = do
     'r' :_ -> do generateHtmlReport; doLoop
     'S':_-> do summarizeAllGPXFile; doLoop
     's':_-> do summarizeGPXFile ; doLoop
+    'f':_-> do fastestKmPace; doLoop
     _    -> do putStrLn ("Invalid  command"); doLoop
+
+--summarize just the given file
+fastestKmPace :: IO()
+fastestKmPace = do
+  putStrLn "Enter the filename:"
+  filename <- getLine
+  putStrLn "Enter distance parameter:"
+  dist <- getLine
+  let d = read dist :: Double
+  getFastestKMPace filename d
+
+--getIntArg :: IO Int
+--getIntArg = fmap (read . head) getArgs
 
 
 --summarize just the given file
@@ -80,6 +95,7 @@ help = do
   putStrLn "S - Summarize all GPX file in the directory to terminal and write to text file"
   putStrLn "s - Summarize given GPX file to terminal"
   putStrLn "r - Summarize all GPX file in the directory and write to HTML file"
+  putStrLn "f - Get the fastest km pace in the long track"
   putStrLn "? - Get this help message"
   putStrLn "q - Quit the program"
 

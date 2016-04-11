@@ -7,6 +7,16 @@ import Text.XML.HXT.Core
 import Text.Printf
 import Text.Tabular
 import Text.Html
+import Data.Maybe
+
+
+getFastestKMPace filename distance = do
+  [trackSegments] <- runX (parseGPX filename >>> getTrkseg)
+  let tracks = trks trackSegments
+      result = catMaybes (phase2 distance tracks)
+      result' = addSndItem' result
+  putStrLn(printf "\nFastest " ++ show distance ++"km pace = "++formatTimeDeltaMS(getFastestPace result') ++ " mins/km")
+
 
 --summarize data for gpx files
 summarizeGPX :: String -> IO ()
