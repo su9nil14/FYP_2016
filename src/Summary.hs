@@ -8,6 +8,9 @@ import Text.Printf
 import Text.Tabular
 import Text.Html
 import Data.Maybe
+import Data.List
+import qualified Text.Tabular.AsciiArt  as A
+import qualified Text.PrettyPrint.Boxes as P
 
 
 getFastestKMPace filename distance = do
@@ -65,8 +68,8 @@ summarizeGPX file = do
 
 
 --summarize data for gpx files
-summarizeGPXDataToTxtFile :: String-> IO ()
-summarizeGPXDataToTxtFile file = do
+summarizeGPXDataToTxtFile :: String -> String-> IO ()
+summarizeGPXDataToTxtFile file path = do
  [trackSegs] <- runX (parseGPX file >>> getTrkseg)
  trackPts <- runX (parseGPX file >>> getTrkpt)
 
@@ -86,19 +89,30 @@ summarizeGPXDataToTxtFile file = do
  let adjustedDistanceRounded = formatDistance adjustedDist 2
  let adjustedPace = formatTimeDeltaMS (seconds/adjustedDist)
 
- let finalStrings = tableFormat file firstdate distance duration avgpaceval totalclimb adjustedDistanceRounded adjustedPace
+ let finalStrings = A.render id id id (headerTable file firstdate distance duration avgpaceval totalclimb adjustedDistanceRounded adjustedPace)
+ putStrLn(printf $ finalStrings)
 
- putStrLn (printf $ finalStrings)
- appendFile ("reportsTxt/summary.txt") $ finalStrings ++"\n"
+ appendFile path $ A.render id id id (headerTable file firstdate distance duration avgpaceval totalclimb adjustedDistanceRounded adjustedPace)
 
 
---table :: (Show a, Show a1) => a -> [Char] -> [Char] -> [Char] -> a1 -> [Char] -> [Char]
-tableFormat file firstdate distance duration avgpaceval totalclimb adjustedDistanceRounded adjustedPace =
-  "Filename\t||DateTime\t\t||Distance\t||Duration\t||Average Pace\t||Total Climb\t||Adjusted Distance\t||Adjusted Pace\n"++
-   show file++"\t\t||"++show firstdate++"\t||"++show distance++"\t\t||"++duration++"\t||"++avgpaceval++"\t\t||"++totalclimb++
-   "\t\t||"++show adjustedDistanceRounded++"\t\t\t||"++adjustedPace ++"\n" 
-     ++ "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
+headerTable filename date dist dur avgpace totclm adjdist adjpace=
+  empty ^..^ colH "Date" ^|^ colH "Distance(km)" ^|^ colH "Duration(h:m:s)" ^|^ colH "AvgPace(mins/km)" ^|^ colH "TotalClimb(m)" 
+        ^|^ colH "Adj Distance(km)" ^|^ colH "Adj Pace(mins/km)"
+  +.+ row filename [show date,show dist,dur,avgpace,totclm,show adjdist,adjpace]
+  
 
+    --  +.+ row filename [show date,show dist,dur,avgpace,totclm,show adjdist,adjpace]
+dataTable filename date dist dur avgpace totclm adjdist adjpace=
+  empty ^..^ colH filename ^||^ colH (show date) ^||^ colH (show dist) ^|^ colH dur ^|^ colH avgpace ^|^ colH totclm 
+   ^|^ colH (show adjdist) ^|^ colH (show adjpace)
+
+
+-- +.+ row filename [show date,show dist,dur,avgpace,totclm,show adjdist,adjpace]
+
+
+
+print_table :: [[String]] -> IO ()
+print_table rows = P.printBox $ P.hsep 2 P.left (map (P.vcat P.left . map P.text) (transpose rows))
 
 
 -- Takes all the Tracksegments and generates the HTML report

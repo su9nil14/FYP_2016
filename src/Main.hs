@@ -3,6 +3,7 @@ module Main (
 ) where
 
 import GPXparser
+import Chart
 import Summary
 import Control.Monad(forM_)
 import Data.List(isSuffixOf)
@@ -27,6 +28,7 @@ doLoop = do
     '?':_ -> do help; doLoop
     'q':_ -> do putStrLn ("Quitting!")
     'r' :_ -> do generateHtmlReport; doLoop
+    'c' :_ -> do generateChart; doLoop
     'S':_-> do summarizeAllGPXFile; doLoop
     's':_-> do summarizeGPXFile ; doLoop
     'f':_-> do fastestKmPace; doLoop
@@ -56,12 +58,16 @@ summarizeGPXFile = do
 --summarize all the .gpx files it can find in the curently directory to txt file
 summarizeAllGPXFile :: IO [()]
 summarizeAllGPXFile = do
+  let path = "reportsTxt"
+  putStrLn "Enter filename to save report to"
+  filename <- getLine
+  createEmptyDirectory path
   curDir <- getCurrentDirectory
   allFiles <- getDirectoryContents curDir
   let allFilesSplit = map splitExtension allFiles
   let gpxFiles = filter (\(_,b) -> b==".gpx") allFilesSplit
   putStrLn ("Processing "++show (length gpxFiles)++" file(s)...")
-  mapM (\(a,b) -> summarizeGPXDataToTxtFile (a++b) ) gpxFiles
+  mapM (\(a,b) -> summarizeGPXDataToTxtFile (a++b) (path++"/"++filename)) gpxFiles
 
 
 
@@ -83,10 +89,32 @@ writeHtmlReport filename gpxFile = do
   points <- runX (parseGPX gpxFile >>> getTrkpt)
   [segs] <- runX (parseGPX gpxFile >>> getTrkseg)
 
+  createEmptyDirectory "reportsHtml"
   let path =  ("reportsHtml/"++filename)
   putStrLn "Generating report..." 
   appendFile ("reportsHtml/"++filename) (renderHtml $ generateHtmlPage gpxFile points segs)
-  --putStrLn $ "Done. Report saved in: "++path
+  putStrLn $ "Report saved in: "++path
+
+
+--generateChart :: IO [Graphics.Rendering.Chart.Renderable.PickFn ()]
+generateChart = do
+  createEmptyDirectory "reportsPNG"
+  putStrLn "Enter the filename to save Chart:"
+  filename <- getLine
+  curDir <- getCurrentDirectory
+  allFiles <- getDirectoryContents curDir
+  let allFilesSplit = map splitExtension allFiles
+  let gpxFiles = filter (\(_,b) -> b==".gpx") allFilesSplit
+  putStrLn ("Processing "++show (length gpxFiles)++" file(s)...")
+  mapM (\(a,b) -> drawPNGChart filename (a++b) ) gpxFiles
+
+
+--drawPNGChart :: [Char]-> String -> IO (Graphics.Rendering.Chart.Renderable.PickFn ())
+drawPNGChart filename gpxFile = do
+  points <- runX (parseGPX gpxFile >>> getTrkpt)
+  let path =  ("reportsPNG/"++filename)
+  putStrLn "Drawing chart..." 
+  drawChart points path
 
   
 help :: IO ()
@@ -95,7 +123,13 @@ help = do
   putStrLn "S - Summarize all GPX file in the directory to terminal and write to text file"
   putStrLn "s - Summarize given GPX file to terminal"
   putStrLn "r - Summarize all GPX file in the directory and write to HTML file"
+  putStrLn "c - Summarize all GPX file in the directory and draw chart in PNG format"
   putStrLn "f - Get the fastest km pace in the long track"
   putStrLn "? - Get this help message"
   putStrLn "q - Quit the program"
 
+
+createEmptyDirectory :: FilePath -> IO ()
+createEmptyDirectory dir = do
+       exists <- doesDirectoryExist dir
+       createDirectoryIfMissing exists dir
