@@ -1,7 +1,8 @@
 # FYP_2016
+
 GPS trace analysis using Haskell
 
-## Requirements
+# Requirements
  hxt package  ```cabal install hxt```
  
  tabular ```cabal install tabular```
@@ -11,12 +12,25 @@ GPS trace analysis using Haskell
  filepath ```cabal install filepath```
 
  html ```cabal install html```
+ 
+ ```cabal update``` and then ```cabal install chart-diagrams```
+ for more info visit https://github.com/timbod7/haskell-chart/wiki
+ 
+ For the cairo backend, it is recommended to install and test gtk2hs
+first.  There are
+[instructions](http://www.haskell.org/haskellwiki/Gtk2Hs/Installation)
+on the haskell wiki. Once that is done, installation of the chart
+library and cairo backend is also straightforward:
+
+    cabal update
+    cabal install chart-cairo
 
 
-Installation process
+#Installation process
 cd to src folder and execute ```ghc Main.hs``` or ```ghci Main.hs```on terminal to start the program
 
-### Usage
+# Usage
+
 ```USAGE  [COMMAND]
 
    S - Summarize all GPX file in the directory to terminal and write to text file
@@ -29,8 +43,9 @@ cd to src folder and execute ```ghc Main.hs``` or ```ghci Main.hs```on terminal 
    
    q - Quit the program ```
 
-#### More resources
-Similar project at -- https://github.com/nurpax/gpx-utils
+# More resources and credits
+
+Similar project at (and credit to) -- https://github.com/nurpax/gpx-utils
 
 http://www.topografix.com/GPX/1/1/
 
