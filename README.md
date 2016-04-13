@@ -3,6 +3,8 @@
 GPS trace analysis using Haskell
 
 # Requirements
+NOTE: It is highly recommended to install this program in Linux. It will work on Unix or Windows but installing gtk+ and its libraries may be problematic or frustarting
+
  hxt package  ```cabal install hxt```
  
  tabular ```cabal install tabular```
