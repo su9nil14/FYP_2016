@@ -28,7 +28,7 @@ doLoop = do
     '?':_ -> do help; doLoop
     'q':_ -> do putStrLn ("Quitting!")
     'r' :_ -> do generateHtmlReport; doLoop
-    'c' :_ -> do generateChart; doLoop
+    'c' :_ -> do drawPNGChart; doLoop
     'S':_-> do summarizeAllGPXFile; doLoop
     's':_-> do summarizeGPXFile ; doLoop
     'f':_-> do fastestKmPace; doLoop
@@ -96,25 +96,21 @@ writeHtmlReport filename gpxFile = do
   putStrLn $ "Report saved in: "++path
 
 
---generateChart :: IO [Graphics.Rendering.Chart.Renderable.PickFn ()]
-generateChart = do
-  createEmptyDirectory "reportsPNG"
-  putStrLn "Enter the filename to save Chart:"
-  filename <- getLine
-  curDir <- getCurrentDirectory
-  allFiles <- getDirectoryContents curDir
-  let allFilesSplit = map splitExtension allFiles
-  let gpxFiles = filter (\(_,b) -> b==".gpx") allFilesSplit
-  putStrLn ("Processing "++show (length gpxFiles)++" file(s)...")
-  mapM (\(a,b) -> drawPNGChart filename (a++b) ) gpxFiles
-
 
 --drawPNGChart :: [Char]-> String -> IO (Graphics.Rendering.Chart.Renderable.PickFn ())
-drawPNGChart filename gpxFile = do
-  points <- runX (parseGPX gpxFile >>> getTrkpt)
+drawPNGChart  = do
+  createEmptyDirectory "reportsPNG"
+  putStrLn "Enter the GPX filename:"
+  gpxFile <- getLine
+  point <- runX (parseGPX gpxFile >>> getTrkpt)
+  [points] <- runX (parseGPX gpxFile >>> getTrkseg)
+  putStrLn "Enter the filename to save PNG chart to:"
+  filename <- getLine
   let path =  ("reportsPNG/"++filename)
   putStrLn "Drawing chart..." 
-  drawChart points path
+  drawChart point path
+  drawChart2 point points path
+
 
   
 help :: IO ()
