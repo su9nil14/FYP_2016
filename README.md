@@ -33,7 +33,7 @@ cd to src folder and execute ```ghc Main.hs``` or ```ghci Main.hs```on terminal 
 
 # Usage
 
-```USAGE  [COMMAND]
+  USAGE  [COMMAND]
 
    S - Summarize all GPX file in the directory to terminal and write to text file
    
@@ -41,9 +41,14 @@ cd to src folder and execute ```ghc Main.hs``` or ```ghci Main.hs```on terminal 
    
    r - Summarize all GPX file in the directory and write to HTML file
    
+   c - Summarize all GPX file in the directory and draw chart in PNG format"
+
+   f - Get the fastest km pace in the long track
+   
    ? - Get this help message
    
-   q - Quit the program ```
+   q - Quit the program
+   
 
 # More resources and credits
 
