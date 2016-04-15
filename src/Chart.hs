@@ -8,7 +8,7 @@ import Data.Maybe
 import Data.Time(UTCTime)
 import Text.Printf
 import Graphics.Rendering.Chart
-import Data.Accessor
+--import Data.Accessor
 import Data.Colour
 import Data.Colour.Names
 import Data.Time.LocalTime
@@ -128,12 +128,12 @@ paceTime point points = zip (tim) (pace) where
 
 drawChart :: [Trackpoint] -> FilePath -> IO (PickFn ())
 drawChart points filename = do
-  renderableToFile def (filename++"1") (distanceElevationOverTimeChart points)
+  renderableToFile def ("1"++filename) (distanceElevationOverTimeChart points)
 
 
 drawChart2 :: [Trackpoint] ->Tracksegment-> FilePath -> IO (PickFn ())
 drawChart2 point points filename = do
-  renderableToFile def (filename++"2") (paceDistanceOverTimeChart point points)
+  renderableToFile def ("2"++filename) (paceDistanceOverTimeChart point points)
 
 
 printpoint2 :: [(LocalTime,Double)] -> String
@@ -143,7 +143,7 @@ printpoint2 s = show $ s
 --main = do
 --  [trackSegs] <- runX (parseGPX "3.gpx" >>> getTrkseg)
 --  trackPts <- runX (parseGPX "3.gpx" >>> getTrkpt)
---  --drawChart trackPts "chart.png"
+--  drawChart trackPts "chart.png"
 --  drawChart2 trackPts trackSegs "chart2.png"
 
   
