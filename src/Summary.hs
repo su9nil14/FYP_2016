@@ -5,16 +5,16 @@ module Summary where
 import GPXparser
 import Text.XML.HXT.Core
 import Text.Printf
-import Text.Tabular
+--import Text.Tabular
 import Text.Html
 import Data.Maybe
 import Data.List
-import qualified Text.Tabular.AsciiArt  as A
-import qualified Text.PrettyPrint.Boxes as P
+--import qualified Text.Tabular.AsciiArt  as A
+--import qualified Text.PrettyPrint.Boxes as P
 
 
 getFastestKMPace filename distance = do
-  [trackSegments] <- runX (parseGPX filename >>> getTrkseg)
+  [trackSegments] <- runX (parseGPX filename >>> getTrksegment)
   let tracks = trks trackSegments
       result = catMaybes (phase2 distance tracks)
       result' = addSndItem' result
@@ -24,8 +24,8 @@ getFastestKMPace filename distance = do
 --summarize data for gpx files
 summarizeGPX :: String -> IO ()
 summarizeGPX file = do
- [trackSegments] <- runX (parseGPX file >>> getTrkseg)
- trackPoints <- runX (parseGPX file >>> getTrkpt)
+ [trackSegments] <- runX (parseGPX file >>> getTrksegment)
+ trackPoints <- runX (parseGPX file >>> getTrkpoint)
 
 
  let (lenKm) = totalDistance trackSegments
@@ -70,9 +70,9 @@ summarizeGPX file = do
 --summarize data for gpx files
 summarizeGPXDataToTxtFile :: String -> String-> IO ()
 summarizeGPXDataToTxtFile file path = do
- [trackSegs] <- runX (parseGPX file >>> getTrkseg)
- trackPts <- runX (parseGPX file >>> getTrkpt)
-
+ [trackSegs] <- runX (parseGPX file >>> getTrksegment)
+ trackPts <- runX (parseGPX file >>> getTrkpoint)
+ 
  
  -- total distance and time of the track
  let (lenKm) = totalDistance trackSegs
@@ -89,41 +89,36 @@ summarizeGPXDataToTxtFile file path = do
  let adjustedDistanceRounded = formatDistance adjustedDist 2
  let adjustedPace = formatTimeDeltaMS (seconds/adjustedDist)
 
- let finalStrings = A.render id id id (headerTable file firstdate distance duration avgpaceval totalclimb adjustedDistanceRounded adjustedPace)
+ let finalStrings = (tableFormatt file firstdate distance duration avgpaceval totalclimb adjustedDistanceRounded adjustedPace)
  putStrLn(printf $ finalStrings)
 
- appendFile path $ A.render id id id (headerTable file firstdate distance duration avgpaceval totalclimb adjustedDistanceRounded adjustedPace)
+ appendFile path $ (tableFormatt file firstdate distance duration avgpaceval totalclimb adjustedDistanceRounded adjustedPace)
 
 
-headerTable filename date dist dur avgpace totclm adjdist adjpace=
-  empty ^..^ colH "Date" ^|^ colH "Distance(km)" ^|^ colH "Duration(h:m:s)" ^|^ colH "AvgPace(mins/km)" ^|^ colH "TotalClimb(m)" 
-        ^|^ colH "Adj Distance(km)" ^|^ colH "Adj Pace(mins/km)"
-  +.+ row filename [show date,show dist,dur,avgpace,totclm,show adjdist,adjpace]
-  
+--headerTable filename date dist dur avgpace totclm adjdist adjpace=
+--  empty ^..^ colH "Date" ^|^ colH "Distance(km)" ^|^ colH "Duration(h:m:s)" ^|^ colH "AvgPace(mins/km)" ^|^ colH "TotalClimb(m)" 
+--        ^|^ colH "Adj Distance(km)" ^|^ colH "Adj Pace(mins/km)"
+--  +.+ row filename [show date,show dist,dur,avgpace,totclm,show adjdist,adjpace]
 
-    --  +.+ row filename [show date,show dist,dur,avgpace,totclm,show adjdist,adjpace]
-dataTable filename date dist dur avgpace totclm adjdist adjpace=
-  empty ^..^ colH filename ^||^ colH (show date) ^||^ colH (show dist) ^|^ colH dur ^|^ colH avgpace ^|^ colH totclm 
-   ^|^ colH (show adjdist) ^|^ colH (show adjpace)
-
-
--- +.+ row filename [show date,show dist,dur,avgpace,totclm,show adjdist,adjpace]
+tableFormatt file firstdate distance duration avgpaceval totalclimb adjustedDistanceRounded adjustedPace =
+  show firstdate++" ||"++show distance++"   ||"++duration++"\t||"++avgpaceval++"\t\t ||"++totalclimb++
+   "\t\t  ||"++show adjustedDistanceRounded++"\t ||"++adjustedPace ++"\t\t  ||"++ show file ++ "\n" 
 
 
 
-print_table :: [[String]] -> IO ()
-print_table rows = P.printBox $ P.hsep 2 P.left (map (P.vcat P.left . map P.text) (transpose rows))
+--print_table :: [[String]] -> IO ()
+--print_table rows = P.printBox $ P.hsep 2 P.left (map (P.vcat P.left . map P.text) (transpose rows))
 
 
 -- Takes all the Tracksegments and generates the HTML report
-generateHtmlPage :: [Char] -> [Trackpoint] -> Tracksegment -> Html
+generateHtmlPage :: [Char] ->[Trackpoint] -> Tracksegment -> Html
 generateHtmlPage file point segs = 
    let header1 = h1 $ stringToHtml ("GPX Summary Data "++file)
 
        title = thetitle $ stringToHtml ("GPX Summary Data "++file++"")
        theStyle = style (stringToHtml cssContent) ! [thetype "text/css"]
        theHeader = header $ concatHtml [title,theStyle]
-       mainArea = thediv (concatHtml [header1,(statsTable point segs),br,chartTable])
+       mainArea = thediv (concatHtml [header1,(statsTable point segs),br,chartTable file])
        theBody = body mainArea
    in concatHtml [theHeader,theBody]--,pageFooter]
 
@@ -184,15 +179,15 @@ cssContent :: [Char]
 cssContent = "h1 {color: #2C558A; font-weight: normal; font-size: x-large; "++
   "text-shadow: white 0px 1px 1px; letter-spacing: 0.1em; font-family: 'Gill Sans', "++
   "'PT Sans', 'Arial', sans-serif; text-transform: uppercase;} " ++
-  "div {    width: 900px; margin-top: 50px; margin:0 auto;} "++
+  "div {    width: 700px; margin-top: 50px; margin:0 auto;} "++
   "table {border-spacing: 20px 0px;} footer {text-align:right; "++
   "background-color:#EEEEEE; width:1000px; margin:0 auto; margin-top: 30px} "
 
 
-chartTable :: Html
-chartTable = 
-   let img1 = image ! [src "elevationTime.png"]
-       img2 = image ! [src "timeDuration.png"]
+chartTable :: String -> Html
+chartTable fname = 
+   let img1 = image ! [src (fname++"1.png")]
+       img2 = image ! [src (fname++"2.png")]
        cell1 =  td img1
        cell2 = td img2
        row1 = tr $ concatHtml [cell1,cell2]

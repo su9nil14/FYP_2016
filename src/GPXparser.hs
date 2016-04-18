@@ -62,8 +62,8 @@ textRead = getChildren >>> getText
 
 
 --turn the elements into Haskell data, by using the features enabled by the Arrows extension
-getTrkpt :: IOSLA (XIOState () ) XmlTree Trackpoint
-getTrkpt = atTag "trkpt" >>>
+getTrkpoint :: IOSLA (XIOState () ) XmlTree Trackpoint
+getTrkpoint = atTag "trkpt" >>>
   proc x -> do
     time_ <- textRead <<< atTag "time" -< x   --the value of x is sent as an input to the arrow text, and matches its output against time_
     lon <- getAttrValue "lon" -< x
@@ -78,10 +78,10 @@ getTrkpt = atTag "trkpt" >>>
 
 
 ----get all the child elements(trkpt(lat,lon),ele,time) inside the root element(trkseg)
-getTrkseg:: IOSLA (XIOState () ) XmlTree Tracksegment 
-getTrkseg = atTag "trkseg" >>>
+getTrksegment:: IOSLA (XIOState () ) XmlTree Tracksegment 
+getTrksegment = atTag "trkseg" >>>
   proc x -> do
-    segments <- listA getTrkpt -< x
+    segments <- listA getTrkpoint -< x
     returnA -< Tracksegment segments
 
 
@@ -221,10 +221,10 @@ getSteepness climb dist = ((climb * 0.001) / (dist)) * 100
 
 -- use divlist to get the pace for each trackpoints
 getPace :: Tracksegment -> [Double]
-getPace pts = pace where
+getPace pts =  pace where
  pace = divLists t d 
- t = trackTime pts --t = time
- d = trackDist pts --d = distance
+ t = filter (>0) (trackTime pts) --t = time
+ d = filter (>0) (trackDist pts) --d = distance
 
 
 --maximum pace in each segments
@@ -238,11 +238,44 @@ minPace points = maximum( filter (<1000) points)
 
 
 -------------------------------------------------------------------Helper functions------------------------------------------------
+getFirst3Items :: (Double,Double,Double) -> Double
+getFirst3Items (x, _, _) = x
+
+
+sliding_average :: Int -> [Double] -> [Double]
+sliding_average _ [] = []
+sliding_average n lists
+  | n <= 0 = []
+  | otherwise =
+      map getFirst3Items $ scanl1 average samples_
+      where
+        divisors = map fromIntegral $ [1..n] ++ (repeat n)
+        n_prevs = (map fromIntegral (replicate (n-1) 0)) ++ lists
+        samples_ = zip3 lists divisors n_prevs
+
+        average :: (Double,Double,Double) -> (Double,Double,Double) -> (Double,Double,Double)
+        average (prev_avg, prev_div, rest) (sample, divisor, n_prev) =
+          (new_avg, divisor, n_prev)
+          where
+            prev_sum = prev_avg * prev_div
+            new_avg = (prev_sum + sample - rest) / divisor
+
+
 --get pace values for each segments -- time / distance = pace
 divLists :: [Double] -> [Double] -> [Double]
+divLists [] [] = []
 divLists xs [] = xs
 divLists [] ys = ys
 divLists (x:xs) (y:ys) = (x / y : divLists xs ys)
+
+
+divLists2 :: Double -> [Double] -> [Double]
+divLists2 n [] = []
+divLists2 n (x:xs) = (x / n : divLists2 n xs)
+
+mulLists :: Double -> [Double] -> [Double]
+mulLists n [] = []
+mulLists n (x:xs) = (x * n : mulLists n xs)
 
 
 --gives a tuple of (lat,lon,time) --> (54.7148590087891,-8.00872611999512,2010-06-07 11:54:40)
@@ -401,8 +434,8 @@ printSteps s = show $ s
 
 --main :: IO ()
 --main = do
---  [trackSegs] <- runX (parseGPX "1.gpx" >>> getTrkseg)
---  trackPts <- runX (parseGPX "1.gpx" >>> getTrkpt)
+--  [trackSegs] <- runX (parseGPX "1.gpx" >>> getTrksegment)
+--  trackPts <- runX (parseGPX "1.gpx" >>> getTrkpoint)
 
 
 

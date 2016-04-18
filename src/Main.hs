@@ -12,6 +12,8 @@ import Text.Html
 import System.FilePath
 import System.Directory
 import System.IO
+
+
 --import System(getArgs)
 
 
@@ -56,10 +58,10 @@ summarizeGPXFile = do
   summarizeGPX filename
 
 --summarize all the .gpx files it can find in the curently directory to txt file
-summarizeAllGPXFile :: IO [()]
+--summarizeAllGPXFile :: IO [()]
 summarizeAllGPXFile = do
   let path = "reportsTxt"
-  putStrLn "Enter filename to save report to"
+  putStrLn "Enter filename to save summary to"
   filename <- getLine
   createEmptyDirectory path
   curDir <- getCurrentDirectory
@@ -67,9 +69,13 @@ summarizeAllGPXFile = do
   let allFilesSplit = map splitExtension allFiles
   let gpxFiles = filter (\(_,b) -> b==".gpx") allFilesSplit
   putStrLn ("Processing "++show (length gpxFiles)++" file(s)...")
+  putStrLn (tableFormat2)
+  writeFile (path++"/"++filename) $ tableFormat2
   mapM (\(a,b) -> summarizeGPXDataToTxtFile (a++b) (path++"/"++filename)) gpxFiles
 
 
+tableFormat2 =
+  "Date                ||Dist   ||Dur(km)\t||Avg Pace(m/km) ||Total Climb(m) ||Adj Dist(km) ||Adj Pace(m/km) ||Filename\n" 
 
 --summarize all the .gpx files it can find in the curently directory in html format
 generateHtmlReport :: IO [()]
@@ -86,12 +92,14 @@ generateHtmlReport = do
 
 writeHtmlReport :: String->String -> IO ()
 writeHtmlReport filename gpxFile = do
-  points <- runX (parseGPX gpxFile >>> getTrkpt)
-  [segs] <- runX (parseGPX gpxFile >>> getTrkseg)
+  points <- runX (parseGPX gpxFile >>> getTrkpoint)
+  [segs] <- runX (parseGPX gpxFile >>> getTrksegment)
 
   createEmptyDirectory "reportsHtml"
-  let path =  ("reportsHtml/"++filename)
-  putStrLn "Generating report..." 
+  let path =  ("reportsHtml/"++gpxFile)
+  putStrLn "Generating report..."
+  drawChart points path
+  drawChart2 points segs path
   appendFile ("reportsHtml/"++filename) (renderHtml $ generateHtmlPage gpxFile points segs)
   putStrLn $ "Report saved in: "++path
 
@@ -102,8 +110,8 @@ drawPNGChart  = do
   createEmptyDirectory "reportsPNG"
   putStrLn "Enter the GPX filename:"
   gpxFile <- getLine
-  point <- runX (parseGPX gpxFile >>> getTrkpt)
-  [points] <- runX (parseGPX gpxFile >>> getTrkseg)
+  point <- runX (parseGPX gpxFile >>> getTrkpoint)
+  [points] <- runX (parseGPX gpxFile >>> getTrksegment)
   putStrLn "Enter the filename to save PNG chart to:"
   filename <- getLine
   let path =  ("reportsPNG/"++filename)
