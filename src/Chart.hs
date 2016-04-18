@@ -48,9 +48,9 @@ elevationOverTimeChart points = toRenderable layout
            $ layout_plots .~ [ toPlot elev, toPlot spots ]
            $ def
 
-  elev = plot_lines_style  .~ lineStyle
-         $ plot_lines_values .~ [[ (theTime, elevation) | (theTime,elevation) <- elevTime points]]
-         $ plot_lines_title .~ "Elevation"
+  elev = plot_fillbetween_style .~ solidFillStyle greenC
+         $ plot_fillbetween_values .~ [ (theTime, (0.0,elevation)) | (theTime,elevation) <- elevTime points]
+         $ plot_fillbetween_title .~ "Elevation"
          $ def
 
   
@@ -71,8 +71,8 @@ elevationOverTimeChart points = toRenderable layout
             $ def
 
   bg = opaque $ white
-  fillC = opaque $ yellow
-  blue1 = opaque $ sRGB 0.5 0.5 1
+  fillC = opaque $ sRGB 0.5 0.5 1.0
+  greenC = opaque $ sRGB 0.5 1.0 0.5
 
 
 
@@ -88,9 +88,9 @@ paceOverTimeChart point points = toRenderable layout
            $ def
 
 
-  pace = plot_lines_style  .~ lineStyle
-         $ plot_lines_values .~ [[ (theTime,paceVal) | (theTime,paceVal) <- paceTime point points]]
-         $ plot_lines_title .~ "Pace"
+  pace = plot_fillbetween_style .~ solidFillStyle blue1
+         $ plot_fillbetween_values .~ [ (theTime,(0.0,paceVal)) | (theTime,paceVal) <- paceTime point points]
+         $ plot_fillbetween_title .~ "Pace"
          $ def
 
 
@@ -99,7 +99,6 @@ paceOverTimeChart point points = toRenderable layout
             $ def
 
   bg = opaque $ white
-  fillC = opaque $ yellow
   blue1 = opaque $ sRGB 0.5 0.5 1
 
 
