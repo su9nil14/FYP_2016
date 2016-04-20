@@ -132,14 +132,14 @@ totalDistance (Tracksegment segs) = (kmLen) where
 
 --------------------------------------------------Calculate time stuffs-----------------------------------------------------------
 --calculate time (difference) between two points
-timeDelta :: Trackpoint -> Trackpoint -> Double
-timeDelta a b = realToFrac $ diffUTCTime (time b) (time a)
+calcTime :: Trackpoint -> Trackpoint -> Double
+calcTime a b = realToFrac $ diffUTCTime (time b) (time a)
 
 
 --calculate time between two points and return a list of times  
 trackTime :: Tracksegment -> [Double]
 trackTime (Tracksegment segs) = (timeLen) where
-    timeLen = (map (uncurry timeDelta) segments)
+    timeLen = (map (uncurry calcTime) segments)
     segments = (zip segs (tail segs))
 
 
@@ -326,7 +326,7 @@ timeOverDistance (x:xs) acc =
 -- Length of track as (seconds)
 trackDuration :: Tracksegment -> (Double)
 trackDuration (Tracksegment segs) = (timeLen) where
-    timeLen = sum (map (uncurry timeDelta) segments)
+    timeLen = sum (map (uncurry calcTime) segments)
     segments = zip segs (tail segs)
 
 
@@ -432,10 +432,20 @@ printSteps :: ([Step]) -> String
 printSteps s = show $ s
 
 
---main :: IO ()
+
+--main :: IO()
 --main = do
---  [trackSegs] <- runX (parseGPX "1.gpx" >>> getTrksegment)
 --  trackPts <- runX (parseGPX "1.gpx" >>> getTrkpoint)
+
+--  let point1 = head trackPts
+--      point2 = head (tail trackPts)
+  
+--  let (lat1,lon1) = getRadianPair point1
+--  let (lat2,lon2) = getRadianPair point2
+
+
+--  putStrLn (show (lat1,lon1) ++ " 1")
+--  putStrLn (show (lat2,lon2) ++ " 2")
 
 
 

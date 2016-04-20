@@ -12,7 +12,7 @@ import Data.List
 --import qualified Text.Tabular.AsciiArt  as A
 --import qualified Text.PrettyPrint.Boxes as P
 
-
+getFastestKMPace :: String -> Double -> IO ()
 getFastestKMPace filename distance = do
   [trackSegments] <- runX (parseGPX filename >>> getTrksegment)
   let tracks = trks trackSegments
